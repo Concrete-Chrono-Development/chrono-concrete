@@ -15,6 +15,7 @@
 //  Application created to test DFC model implementation in chrono::multicore.
 //  Implemented tests include three tests done in container: gravity-driven tests (1 and 2)
 //  and hydrostatic confinement test.
+
 #include <vector>
 #include "chrono_multicore/physics/ChSystemMulticore.h"
 #include "chrono/collision/ChCollisionSystemBullet.h"
@@ -47,7 +48,8 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   bottom_wall->SetBodyFixed(true);
   bottom_wall->SetCollide(true);
   bottom_wall->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat, ChVector<>(container_size, container_size, thickness));
+  utils::AddBoxGeometry(bottom_wall.get(), mat,
+			ChVector<>(container_size, container_size, thickness));
   bottom_wall->GetCollisionModel()->BuildModel();
 
   auto side_wall_1 = std::shared_ptr<ChBody>(sys->NewBody());
@@ -57,7 +59,8 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   side_wall_1->SetBodyFixed(true);
   side_wall_1->SetCollide(true);
   side_wall_1->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat, ChVector<>(thickness, container_size, container_size));
+  utils::AddBoxGeometry(bottom_wall.get(), mat,
+			ChVector<>(thickness, container_size, container_size));
   side_wall_1->GetCollisionModel()->BuildModel();
 
   auto side_wall_2 = std::shared_ptr<ChBody>(sys->NewBody());
@@ -67,7 +70,8 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   side_wall_2->SetBodyFixed(true);
   side_wall_2->SetCollide(true);
   side_wall_2->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat, ChVector<>(thickness, container_size, container_size));
+  utils::AddBoxGeometry(bottom_wall.get(), mat,
+			ChVector<>(thickness, container_size, container_size));
   side_wall_2->GetCollisionModel()->BuildModel();
 
   auto side_wall_3 = std::shared_ptr<ChBody>(sys->NewBody());
@@ -77,7 +81,8 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   side_wall_3->SetBodyFixed(true);
   side_wall_3->SetCollide(true);
   side_wall_3->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat, ChVector<>(container_size, thickness, container_size));
+  utils::AddBoxGeometry(bottom_wall.get(), mat,
+			ChVector<>(container_size, thickness, container_size));
   side_wall_3->GetCollisionModel()->BuildModel();
 
   auto side_wall_4 = std::shared_ptr<ChBody>(sys->NewBody());
@@ -87,7 +92,8 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   side_wall_4->SetBodyFixed(true);
   side_wall_4->SetCollide(true);
   side_wall_4->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat, ChVector<>(container_size, thickness, container_size));
+  utils::AddBoxGeometry(bottom_wall.get(), mat,
+			ChVector<>(container_size, thickness, container_size));
   side_wall_4->GetCollisionModel()->BuildModel();
   
   sys->AddBody(bottom_wall);
@@ -103,6 +109,16 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   return collection_of_walls;
 }
 
+
+void create_concrete(ChSystemMulticoreSMC* sys, double container_size,
+		     double mortar_layer_thick){
+  // function creates sphere bodies to represent concrete in a container
+  // for now it fills container box with given size [m], rest of the parameters
+  // are defined as local variables, except for thickness of mortat layer, which is
+  // DFC parameter, so I don't want to have two paralell definitions
+  
+  //  return true
+}
 
 int main(int argc, char* argv[]) {
   GetLog() << "Test application for implementation of DFC model in chrono::multicore\n";
