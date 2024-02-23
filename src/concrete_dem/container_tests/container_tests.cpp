@@ -22,16 +22,20 @@
 #include "chrono_irrlicht/ChVisualSystemIrrlicht.h"
 #include "chrono/assets/ChVisualSystem.h"
 #include "chrono/utils/ChUtilsCreators.h"
+#include "chrono/particlefactory/ChParticleRemover.h"
+#include "chrono/particlefactory/ChParticleEmitter.h"
+#include "chrono/core/ChDistribution.h"
 
 using namespace chrono;
 using namespace chrono::irrlicht;
+using namespace chrono::particlefactory;
 
 chrono::collision::ChCollisionSystemType collision_type =
   chrono::collision::ChCollisionSystemType::BULLET;
 
 std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
 						      double container_size){
-  // container size given in [m], its postionion cannot be changed (bottom surface mid point
+  // container size given in [m], its positioning cannot be changed (bottom surface mid point
   // at the beginning of the global coordinate system
   // returned vector stores created objects 
   double thickness = 0.01;  // wall thickness (container will be build from boxes)
@@ -55,44 +59,44 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   auto side_wall_1 = std::shared_ptr<ChBody>(sys->NewBody());
   side_wall_1->SetMass(1);
   side_wall_1->SetInertiaXX(ChVector<>(1, 1, 1));
-  side_wall_1->SetPos(ChVector<>(0, container_size + thickness/2, 0));
+  side_wall_1->SetPos(ChVector<>(container_size/2 + thickness/2, 0, container_size/2));
   side_wall_1->SetBodyFixed(true);
   side_wall_1->SetCollide(true);
   side_wall_1->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat,
+  utils::AddBoxGeometry(side_wall_1.get(), mat,
 			ChVector<>(thickness, container_size, container_size));
   side_wall_1->GetCollisionModel()->BuildModel();
 
   auto side_wall_2 = std::shared_ptr<ChBody>(sys->NewBody());
   side_wall_2->SetMass(1);
   side_wall_2->SetInertiaXX(ChVector<>(1, 1, 1));
-  side_wall_2->SetPos(ChVector<>(0, -container_size - thickness/2, 0));
+  side_wall_2->SetPos(ChVector<>(-container_size/2 - thickness/2, 0, container_size/2));
   side_wall_2->SetBodyFixed(true);
   side_wall_2->SetCollide(true);
   side_wall_2->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat,
+  utils::AddBoxGeometry(side_wall_2.get(), mat,
 			ChVector<>(thickness, container_size, container_size));
   side_wall_2->GetCollisionModel()->BuildModel();
 
   auto side_wall_3 = std::shared_ptr<ChBody>(sys->NewBody());
   side_wall_3->SetMass(1);
   side_wall_3->SetInertiaXX(ChVector<>(1, 1, 1));
-  side_wall_3->SetPos(ChVector<>(-container_size - thickness/2, 0, 0));
+  side_wall_3->SetPos(ChVector<>(0, -container_size/2 - thickness/2, container_size/2));
   side_wall_3->SetBodyFixed(true);
   side_wall_3->SetCollide(true);
   side_wall_3->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat,
+  utils::AddBoxGeometry(side_wall_3.get(), mat,
 			ChVector<>(container_size, thickness, container_size));
   side_wall_3->GetCollisionModel()->BuildModel();
 
   auto side_wall_4 = std::shared_ptr<ChBody>(sys->NewBody());
   side_wall_4->SetMass(1);
   side_wall_4->SetInertiaXX(ChVector<>(1, 1, 1));
-  side_wall_4->SetPos(ChVector<>(container_size + thickness/2, 0, 0));
+  side_wall_4->SetPos(ChVector<>(0, container_size/2 + thickness/2, container_size/2));
   side_wall_4->SetBodyFixed(true);
   side_wall_4->SetCollide(true);
   side_wall_4->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(bottom_wall.get(), mat,
+  utils::AddBoxGeometry(side_wall_4.get(), mat,
 			ChVector<>(container_size, thickness, container_size));
   side_wall_4->GetCollisionModel()->BuildModel();
   
@@ -109,16 +113,23 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   return collection_of_walls;
 }
 
-
-void create_concrete(ChSystemMulticoreSMC* sys, double container_size,
-		     double mortar_layer_thick){
-  // function creates sphere bodies to represent concrete in a container
-  // for now it fills container box with given size [m], rest of the parameters
-  // are defined as local variables, except for thickness of mortat layer, which is
-  // DFC parameter, so I don't want to have two paralell definitions
-  
-  //  return true
-}
+// define a class for concrete particle distribution
+class DFCParticleDistr : public ChDistribution {
+public:
+  DFCParticleDistr(double min_size, double max_size, double mortar_layer, double mq)
+    : d_0(max_size), d_a(min_size), h(mortar_layer), q(mq) {
+  }
+  virtual double GetRandom() override {
+    double P = ChRandom();
+    double aggregate_D = d_0 * pow((1 - P * (1 - pow(d_0, q)/pow(d_a, q))), (-1/q));
+    return aggregate_D + 2 * h;
+  }
+private:
+  double d_0;
+  double d_a;
+  double h;
+  double q;
+};
 
 int main(int argc, char* argv[]) {
   GetLog() << "Test application for implementation of DFC model in chrono::multicore\n";
@@ -128,6 +139,78 @@ int main(int argc, char* argv[]) {
   ChSystemMulticoreSMC sys;
   sys.Set_G_acc(ChVector<>(0, 0, -9.81));
   std::vector<std::shared_ptr<ChBody>> container_walls = create_container(&sys, 0.15);
+
+  // concrete and DFC parameters (SI units)
+  double containerVol = 0.15 * 0.15 * 0.15;
+  double Vol = containerVol * 2;
+  double h_layer = 4e-3;
+  double minD = 0.005;  // minimum aggregate size
+  double maxD = 0.01;  // maximum aggregate size
+  double cement = 797;  // cement content kg/m^3
+  double WtoC = 0.4;  // water-to-cement ratio
+  double AtoC = 2.25;  // aggregate-to-cement ratio
+  double rho_c = 3150;  // cement density kg/m^3
+  double rho_w = 1000;  // water density kg/m^3
+  double vair = 0;
+  double nF = 0.5;  // Fuller exponent
+  double va = 1 - cement / rho_c - (WtoC * cement) / rho_w - vair;  // aggregate volume fraction
+  double va0 = (1 - pow((minD/maxD), nF)) * va;  // aggregate volume fraction with size bigger minD
+  double Va0 = va0 * Vol;  // aggregate volume (with size bigger than minD)
+  double rho_0 = cement * (1 + WtoC + AtoC);  // mixture density
+  double targetmass = Va0 * rho_0;
+  double targetVol = containerVol * 2.5;
+  sys.GetSettings()->dfc_contact_param.E_Nm = 0.04e6;  // 2nd param --> 0.25 / 0.50 / 1 / 2 / 4 
+  sys.GetSettings()->dfc_contact_param.E_Na = 100e6;
+  sys.GetSettings()->dfc_contact_param.h = h_layer; // 1st param --> 0.75 / 1 / 1.10 / 1.20 / 1.40 
+  sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;
+  sys.GetSettings()->dfc_contact_param.beta = 0.5;
+  sys.GetSettings()->dfc_contact_param.sigma_t = 0.005e6;  // 3 rd param 0.25 / 0.50 / 1 / 2 / 4
+  sys.GetSettings()->dfc_contact_param.sigma_tau0 = 0.0005e6;  // 4th param 0.25 / 0.50 / 1 / 2 / 4
+  sys.GetSettings()->dfc_contact_param.eta_inf = 50;       /// 5th param 0.25 / 0.50 / 1 / 2 / 4
+  sys.GetSettings()->dfc_contact_param.kappa_0 = 100;
+  sys.GetSettings()->dfc_contact_param.n = 1;
+  sys.GetSettings()->dfc_contact_param.mi_a = 0.5;
+  sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.04e6;
+  sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;
+  sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;
+  sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.005e6;
+  sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 0.0005e6;
+  sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;
+  sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;
+  sys.GetSettings()->dfc_contact_param.t = 4e-3;
+  sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
+
+  // particle emitter
+  ChParticleEmitter emitter;
+  emitter.ParticlesPerSecond() = 10000;
+  emitter.SetUseParticleReservoir(true);
+  emitter.ParticleReservoirAmount() = 10;
+  auto emitter_positions = chrono_types::make_shared<ChRandomParticlePositionRectangleOutlet>();
+  emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.2), QUNIT);
+  emitter_positions->OutletWidth() = 0.135;
+  emitter_positions->OutletHeight() = 0.135;
+  emitter.SetParticlePositioner(emitter_positions);
+  auto emitter_rotations = chrono_types::make_shared<ChRandomParticleAlignmentUniform>();
+  emitter.SetParticleAligner(emitter_rotations);
+  auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
+  mvelo->SetDirection(-VECT_Z);
+  mvelo->SetModulusDistribution(4);
+  emitter.SetParticleVelocity(mvelo);
+  auto mcreator_spheres = chrono_types::make_shared<ChRandomShapeCreatorSpheres>();
+  mcreator_spheres->SetDiameterDistribution(chrono_types::make_shared<DFCParticleDistr>(maxD,
+											minD,
+											h_layer,
+											2.5));
+  mcreator_spheres->SetDensityDistribution(chrono_types::make_shared<ChConstantDistribution>(rho_0));
+  auto sphere_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  sphere_mat->SetYoungModulus(0.04e6);
+  sphere_mat->SetFriction(0.5);
+  sphere_mat->SetRestitution(0.3);
+  sphere_mat->SetAdhesion(0.1);
+  //mcreator_spheres->SetMaterial(sphere_mat); // no method SetMaterial
+  emitter.SetParticleCreator(mcreator_spheres);
+					    
+
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
   vis_irr->AttachSystem(&sys);
@@ -136,17 +219,44 @@ int main(int argc, char* argv[]) {
   vis_irr->Initialize();
   vis_irr->AddLogo();
   vis_irr->AddSkyBox();
-  vis_irr->AddCamera(ChVector<>(0, 0.05, -0.1));
+  vis_irr->AddCamera(ChVector<>(0.5, 0.5, 1));
   vis_irr->AddTypicalLights();
   vis = vis_irr;
+  class MyCreatorForAll : public ChRandomShapeCreator::AddBodyCallback {
+  public:
+    virtual void OnAddBody(std::shared_ptr<ChBody> mbody,
+                           ChCoordsys<> mcoords,
+                           ChRandomShapeCreator& mcreator) override {
+      vis->BindItem(mbody);
+      mbody->SetNoGyroTorque(true);
+      sys->AddBody(mbody);
+      //mbody->SetSleeping(true);
+      std::cout << mbody->GetBodyFixed() << "\n";
+    }
+    ChVisualSystemIrrlicht* vis;
+    ChSystemMulticoreSMC* sys;
+    };
+  auto mcreation_callback = chrono_types::make_shared<MyCreatorForAll>();
+  mcreation_callback->vis = vis_irr.get();
+  mcreation_callback->sys = &sys;
+  emitter.RegisterAddBodyCallback(mcreation_callback);
   double simulation_time = 0;
-  double time_step = 1e-03;
-  while (simulation_time <= 1) {
+  double time_step = 1e-02;
+  bool switch_val = true;
+  while (vis->Run()) {
     vis->BeginScene();
     vis->Render();
     vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
     vis->RenderCOGFrames(1.0);
+    emitter.EmitParticles(sys, time_step);
+    sys.Setup();
+    auto body_list = sys.Get_bodylist();
+    switch_val = true;
     sys.DoStepDynamics(time_step);
+    for (auto body:body_list){
+      std::cout << "Simulation time: " << simulation_time << "\n";
+      std::cout << body->GetPos_dt() << "\n";
+    }
     vis->EndScene();
     simulation_time += time_step;
   }

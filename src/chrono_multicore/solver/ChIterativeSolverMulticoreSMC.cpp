@@ -771,7 +771,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         }
     }
     
-    // Calculata strain rates
+    // Calculate strain rates
     real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
     real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;  // previous code: Length(u_IJ_ML_dt_vec)
 
@@ -825,7 +825,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
                 cont_neigh[ctIdUnrolled].x = body_J;
                 cont_neigh[ctIdUnrolled].y = shape_body_I;
                 cont_neigh[ctIdUnrolled].z = shape_body_J;
-                DFC_stress[ctIdUnrolled].x = 0;
+                DFC_stress[ctIdUnrolled].x = epsilon_N * E_Nm;  // Assumed mortar initial contact
                 DFC_stress[ctIdUnrolled].y = 0;
                 DFC_stress[ctIdUnrolled].z = 0;
                 break;
