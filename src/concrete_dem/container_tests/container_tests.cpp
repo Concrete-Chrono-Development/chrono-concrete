@@ -25,6 +25,7 @@
 #include "chrono/particlefactory/ChParticleRemover.h"
 #include "chrono/particlefactory/ChParticleEmitter.h"
 #include "chrono/core/ChDistribution.h"
+#include "ParticleEmitterMulticore.h"
 
 using namespace chrono;
 using namespace chrono::irrlicht;
@@ -181,10 +182,11 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
 
   // particle emitter
-  ChParticleEmitter emitter;
-  emitter.ParticlesPerSecond() = 10000;
-  emitter.SetUseParticleReservoir(true);
-  emitter.ParticleReservoirAmount() = 10;
+  ParticleEmitterMulticore emitter;
+  emitter.SetSystem(&sys);
+  emitter.SetParticlesPerSecond(10);
+  emitter.SetParticleReservoir(9000);
+  emitter.SetMortarLayer(h_layer);
   auto emitter_positions = chrono_types::make_shared<ChRandomParticlePositionRectangleOutlet>();
   emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.2), QUNIT);
   emitter_positions->OutletWidth() = 0.135;
@@ -195,21 +197,7 @@ int main(int argc, char* argv[]) {
   auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
   mvelo->SetDirection(-VECT_Z);
   mvelo->SetModulusDistribution(4);
-  emitter.SetParticleVelocity(mvelo);
-  auto mcreator_spheres = chrono_types::make_shared<ChRandomShapeCreatorSpheres>();
-  mcreator_spheres->SetDiameterDistribution(chrono_types::make_shared<DFCParticleDistr>(maxD,
-											minD,
-											h_layer,
-											2.5));
-  mcreator_spheres->SetDensityDistribution(chrono_types::make_shared<ChConstantDistribution>(rho_0));
-  auto sphere_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
-  sphere_mat->SetYoungModulus(0.04e6);
-  sphere_mat->SetFriction(0.5);
-  sphere_mat->SetRestitution(0.3);
-  sphere_mat->SetAdhesion(0.1);
-  //mcreator_spheres->SetMaterial(sphere_mat); // no method SetMaterial
-  emitter.SetParticleCreator(mcreator_spheres);
-					    
+  emitter.SetParticleVelocity(mvelo);	    
 
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
@@ -236,19 +224,16 @@ int main(int argc, char* argv[]) {
     ChVisualSystemIrrlicht* vis;
     ChSystemMulticoreSMC* sys;
     };
-  auto mcreation_callback = chrono_types::make_shared<MyCreatorForAll>();
-  mcreation_callback->vis = vis_irr.get();
-  mcreation_callback->sys = &sys;
-  emitter.RegisterAddBodyCallback(mcreation_callback);
+  emitter.SetVisualisation(vis_irr.get());
   double simulation_time = 0;
-  double time_step = 1e-02;
+  double time_step = 1e-04;
   bool switch_val = true;
   while (vis->Run()) {
     vis->BeginScene();
     vis->Render();
     vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
-    vis->RenderCOGFrames(1.0);
-    emitter.EmitParticles(sys, time_step);
+    //vis->RenderCOGFrames(1.0);
+    emitter.EmitParticles(time_step);
     sys.Setup();
     auto body_list = sys.Get_bodylist();
     switch_val = true;
