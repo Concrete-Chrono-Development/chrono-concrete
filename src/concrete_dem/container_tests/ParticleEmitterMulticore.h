@@ -31,6 +31,7 @@ namespace particlefactory{
       material->SetYoungModulus(2.05e11);
       material->SetPoissonRatio(0.3);
       material->SetRestitution(0.5);
+      material->SetFriction(0.2);
       sys = nullptr;
       vis = nullptr;
       mortar_layer = 0;
@@ -101,10 +102,10 @@ namespace particlefactory{
       bsphere->SetInertiaXX((2.0 / 5.0) * mass * pow(mrad, 3) * ChVector<>(1, 1, 1));
       bsphere->SetMass(mass);
       bsphere->GetCollisionModel()->ClearModel();
-      bsphere->GetCollisionModel()->AddSphere(material, mrad);
-      bsphere->GetCollisionModel()->BuildModel();
+      utils::AddSphereGeometry(bsphere.get(), material, mrad);
       bsphere->SetCollide(true);
-      //bsphere->SetBodyFixed(false);
+      bsphere->GetCollisionModel()->BuildModel();
+    //bsphere->SetBodyFixed(false);
       auto sphere1 = chrono_types::make_shared<ChSphereShape>(mrad);
       sphere1->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
       sphere1->SetOpacity(0.4f);
