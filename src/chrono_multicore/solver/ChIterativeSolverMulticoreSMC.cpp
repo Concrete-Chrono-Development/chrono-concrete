@@ -804,6 +804,16 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         epsilon_N = log(l_IJ/ (R_I + t - h/2));
     }
 
+    // Calculate epsilon_a
+    real epsilon_a;
+    if (R_I != -1 && R_J != -1) {
+      epsilon_a = -log(1 + h / (R_I + R_J - 2*h));
+    } else if (R_I == -1) {
+      epsilon_a = -log(1 + h / (R_J - h + t));
+    } else {
+      epsilon_a = -log(1 + h / (R_I - h + t));
+    }
+
     // Check if contact history already exists. If not, initialize new contact history.
     int i;
     int contact_id = -1;
@@ -825,7 +835,15 @@ void function_CalcDFCForces(int index,               // index of this contact pa
                 cont_neigh[ctIdUnrolled].x = body_J;
                 cont_neigh[ctIdUnrolled].y = shape_body_I;
                 cont_neigh[ctIdUnrolled].z = shape_body_J;
-                DFC_stress[ctIdUnrolled].x = epsilon_N * E_Nm;  // Assumed mortar initial contact
+		if (epsilon_N > epsilon_a) {
+		  if (epsilon_N * E_Nm < sigma_t) {
+		    DFC_stress[ctIdUnrolled].x = epsilon_N * E_Nm;  // for mortar initial contact
+		  } else {
+		    DFC_stress[ctIdUnrolled].x = sigma_t;
+		  }
+		} else {
+		  DFC_stress[ctIdUnrolled].x = epsilon_N * E_Na; // for aggregate initial contact
+		}
                 DFC_stress[ctIdUnrolled].y = 0;
                 DFC_stress[ctIdUnrolled].z = 0;
                 break;
@@ -854,14 +872,6 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         delta_sigma_ML_s = 0;
     }
     else {
-        real epsilon_a;
-        if (R_I != -1 && R_J != -1) {
-            epsilon_a = -log(1 + h / (R_I + R_J - 2*h));
-        } else if (R_I == -1) {
-            epsilon_a = -log(1 + h / (R_J - h + t));
-        } else {
-            epsilon_a = -log(1 + h / (R_I - h + t));
-        }
         if (epsilon_N > epsilon_a){
             sigma_N_s = input_sigma_N_s;
             sigma_ML_s = 0;

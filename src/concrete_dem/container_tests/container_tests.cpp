@@ -75,7 +75,7 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   double thickness = 0.01;  // wall thickness (container will be build from boxes)
   double density = 1000;
   auto mat = chrono_types::make_shared<chrono::ChMaterialSurfaceSMC>();
-  mat->SetYoungModulus(2.05e6);
+  mat->SetYoungModulus(2.05e11);
   mat->SetPoissonRatio(0.3);
   mat->SetRestitution(0.5);
   mat->SetFriction(0.2);
@@ -230,11 +230,11 @@ int main(int argc, char* argv[]) {
   // particle emitter
   ParticleEmitterMulticore emitter;
   emitter.SetSystem(&sys);
-  emitter.SetParticlesPerSecond(1e7);
+  emitter.SetParticlesPerSecond(1e6);
   emitter.SetParticleReservoir(9000);
   emitter.SetMortarLayer(h_layer);
   auto emitter_positions = chrono_types::make_shared<ChRandomParticlePositionRectangleOutlet>();
-  emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.02), QUNIT);
+  emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.01), QUNIT);
   emitter_positions->OutletWidth() = 0.135;
   emitter_positions->OutletHeight() = 0.135;
   emitter.SetParticlePositioner(emitter_positions);
@@ -242,7 +242,7 @@ int main(int argc, char* argv[]) {
   emitter.SetParticleAligner(emitter_rotations);
   auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
   mvelo->SetDirection(-VECT_Z);
-  mvelo->SetModulusDistribution(0.1);
+  mvelo->SetModulusDistribution(0.004);
   emitter.SetParticleVelocity(mvelo);
 
   //for (int i = 0; i < 10; i++){
@@ -276,13 +276,13 @@ int main(int argc, char* argv[]) {
     };
   emitter.SetVisualisation(vis_irr.get());
   double simulation_time = 0;
-  double time_step = 1e-06;
+  double time_step = 1e-05;
   bool switch_val = true;
   while (vis->Run()) {
     vis->BeginScene();
     vis->Render();
     vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
-    vis->RenderCOGFrames(1.0);
+    //vis->RenderCOGFrames(1.0);
     if (switch_val) {
       emitter.EmitParticles(time_step);
       switch_val = false;
