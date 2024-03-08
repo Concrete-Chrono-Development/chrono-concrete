@@ -26,22 +26,20 @@
 #include "chrono/particlefactory/ChParticleEmitter.h"
 #include "chrono/core/ChDistribution.h"
 #include "ParticleEmitterMulticore.h"
+#include "MyContactReport.h"
 
 using namespace chrono;
 using namespace chrono::irrlicht;
 using namespace chrono::particlefactory;
 
-chrono::collision::ChCollisionSystemType collision_type =
-  chrono::collision::ChCollisionSystemType::BULLET;
-
-void AddSphere(ChSystemMulticore& sys, double pos, int id){
+std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, double pos, int id){
   auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
   material->SetFriction(0.2);
-  double radius = 0.005;   // in meters, I have doubt about used units
-  double h = 3e-3;
+  double radius = 0.008;   // in meters, I have doubt about used units
+  double h = 4e-3;
   double density = 797 / (1 + 0.4 + 2.25);
   double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;
   auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
@@ -49,7 +47,7 @@ void AddSphere(ChSystemMulticore& sys, double pos, int id){
   ball->SetMass(mass);
   ball->SetIdentifier(id);
   ball->SetPos(chrono::ChVector<>(0, 0, pos));
-  ball->SetPos_dt(chrono::ChVector<>(0, 0, -4));
+  ball->SetPos_dt(chrono::ChVector<>(0, -0.04, -0.4));
   ball->GetCollisionModel()->ClearModel();
   utils::AddSphereGeometry(ball.get(), material, radius);
   ball->SetBodyFixed(false);
@@ -64,7 +62,8 @@ void AddSphere(ChSystemMulticore& sys, double pos, int id){
   ball_vis->AddShape(sphere1);
   ball_vis->AddShape(sphere2);
   ball->AddVisualModel(ball_vis);
-  sys.AddBody(ball);	
+  sys.AddBody(ball);
+  return ball;
 }
 
 std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
@@ -245,11 +244,17 @@ int main(int argc, char* argv[]) {
   mvelo->SetModulusDistribution(0.004);
   emitter.SetParticleVelocity(mvelo);
 
-  //for (int i = 0; i < 10; i++){
-  //  AddSphere(sys, 0.15 + i * 0.02, i + 10);
-  //}
-
+  int ball_number = 0;
+  std::vector<std::shared_ptr<ChBody>> created_balls;
+  created_balls.push_back(AddSphere(sys, 0.015, 1));
+  created_balls.push_back(AddSphere(sys, 0.025, 1));
+  created_balls.push_back(AddSphere(sys, 0.035, 1));
+  created_balls.push_back(AddSphere(sys, 0.045, 1));
+  created_balls.push_back(AddSphere(sys, 0.055, 1));
+  created_balls.push_back(AddSphere(sys, 0.065, 1));
+  ball_number += 6;
   std::shared_ptr<ChVisualSystem> vis;
+
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
   vis_irr->AttachSystem(&sys);
   vis_irr->SetWindowSize(800, 600);
@@ -268,16 +273,47 @@ int main(int argc, char* argv[]) {
       vis->BindItem(mbody);
       mbody->SetNoGyroTorque(true);
       sys->AddBody(mbody);
-      //mbody->SetSleeping(true);
-      std::cout << mbody->GetBodyFixed() << "\n";
     }
     ChVisualSystemIrrlicht* vis;
     ChSystemMulticoreSMC* sys;
     };
   emitter.SetVisualisation(vis_irr.get());
   double simulation_time = 0;
-  double time_step = 1e-05;
-  bool switch_val = true;
+  double time_step = 2e-05;
+  bool switch_val = false;
+
+  // text file for post-processing contact/collision data; first row stores column descriptors
+  bool register_data = true;
+  std::ofstream data_files[ball_number];
+  if (register_data) {
+    for (int i = 1; i <= ball_number; i++) {
+      std::string file_name = "ball_" + std::to_string(i) + ".txt";
+      const char* file_name_to_pass = file_name.c_str();  // convert type for object constructor
+      data_files[i - 1].open(file_name_to_pass);
+      data_files[i - 1] << "Sim time [s] ,"
+			<< "Pos x [m], "
+			<< "Pos y [m], "
+			<< "Pos z [m], "
+			<< "Vel x [m/s], "
+			<< "Vel y [m/s], "
+			<< "Vel z [m/s], "
+			<< "Rot ang [-], "
+			<< "Rot axis x, "
+			<< "Rot axis y, "
+			<< "Rot axis z, "
+			<< "Ang_vel x [m/s], "
+			<< "Ang_vel y [m/s], "
+			<< "Ang_vel z [m/s], "
+			<< "Cont defor [m], "
+			<< "Cont force x [N], "
+			<< "Cont force res y [N], "
+			<< "Cont force res z [N], "
+			<< "Cont torque res x [Nm], "
+			<< "Cont torque res y [Nm], "
+			<< "Cont torque res z [Nm], " 
+			<< "\n";
+    }
+  }
   while (vis->Run()) {
     vis->BeginScene();
     vis->Render();
@@ -287,15 +323,51 @@ int main(int argc, char* argv[]) {
       emitter.EmitParticles(time_step);
       switch_val = false;
     }
-    auto body_list = sys.Get_bodylist();
-    if (simulation_time > 0.001) {
-      sys.DoStepDynamics(time_step);
-    }
-    for (auto body:body_list){
-      std::cout << "Simulation time: " << simulation_time << "\n";
-      std::cout << body->GetPos_dt() << "\n";
-    }
+    sys.DoStepDynamics(time_step);
     vis->EndScene();
+    if (register_data) {
+      std::shared_ptr<MyContactReport> contact_data_ptr = std::make_shared<MyContactReport>();
+      sys.GetContactContainer()->ReportAllContacts(contact_data_ptr);
+      for (int i = 0; i < ball_number; i++){
+	data_files[i] << simulation_time << ", " ;
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetPos()[j] << ", ";
+	}
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetPos_dt()[j] << ", ";
+	}
+	data_files[i] << created_balls[i]->GetRotAngle() << ", ";
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetRotAxis()[j] << ", ";
+	}
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetWvel_par()[j] << ", ";
+	}
+	if (!contact_data_ptr->VectorOfCollisionData.empty()) {
+	  bool added_contact_force = false;
+	  for (auto e : contact_data_ptr->VectorOfCollisionData){
+	    if (e.contactobjA == created_balls[i]->GetCollisionModel()->GetContactable() ||
+		e.contactobjB == created_balls[i]->GetCollisionModel()->GetContactable()) {
+	      data_files[i] << e.distance << ", ";
+	      for (int j = 0; j < 3; j++) {
+		data_files[i] << e.react_forces[j] << ", ";
+	      }
+	      for (int j = 0; j < 3; j++) {
+		data_files[i] << e.react_torques[j] << ", ";
+	      }
+	      data_files[i] << "\n";
+	      added_contact_force = true;
+	    }
+	  }
+	  if (!added_contact_force) {
+	    data_files[i] << "0, 0, 0, 0, 0, 0, 0\n";
+	  }
+	} else {
+	  data_files[i] << "0, 0, 0, 0, 0, 0, 0\n";
+	}
+      }
+    }
+    
     simulation_time += time_step;
   }
   return 0;

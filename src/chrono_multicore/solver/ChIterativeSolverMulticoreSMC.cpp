@@ -631,7 +631,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         mi_a = param.mi_a;
         t = 0;
     } else {  // any of the contacting shapes is not a sphere
-        E_Nm = param.E_Na_s;
+        E_Nm = param.E_Nm_s;
         E_Na = param.E_Na_s;
         h = param.h;
         alfa_a = param.alfa_a_s;
@@ -680,7 +680,12 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     }
 
     // Calculate versor of normal direction, pointing from I to J
-    auto e_IJ_N_vec = (pos[body_J] - pos[body_I]) / l_IJ;
+    real3 e_IJ_N_vec;
+    if (R_I != -1 && R_J != -1) {
+      e_IJ_N_vec = (pos[body_J] - pos[body_I]) / l_IJ;
+    } else {
+      e_IJ_N_vec = -normal[index];
+    }
     // Calculate distance from center o body I to contact surface
     real a_I;
     if (R_I != -1 && R_J != -1) {
@@ -753,6 +758,23 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         }
         auto global_tangent_direction1 = transformation_quaternion.Rotate(chrono::ChVector(0, 1, 0));
         auto global_tangent_direction2 = transformation_quaternion.Rotate(chrono::ChVector(0, 0, 1));
+	real dir1_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(),
+						  global_tangent_direction1.y(),
+						  global_tangent_direction1.z()));
+	real dir2_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(),
+						  global_tangent_direction2.y(),
+						  global_tangent_direction2.z()));
+	real3 dir1_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(),
+			       global_tangent_direction1.z()) * dir1_val;
+	real3 dir2_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(),
+			       global_tangent_direction2.z()) * dir2_val;
+	auto temp_direction = dir1_vec + dir2_vec;
+	if (Length(temp_direction) != 0) {
+	  e_IJ_ML_vec = temp_direction/Length(temp_direction);
+	} else {
+	  e_IJ_ML_vec = real3(0, 0, 0);
+	}
+	/*
         if (Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z())) == 0) {
             e_IJ_ML_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z());
         }
@@ -760,15 +782,26 @@ void function_CalcDFCForces(int index,               // index of this contact pa
             e_IJ_ML_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z());
         } else {
             std::cout << "Definition of tangent direction failed. Check the problem.";
-        }
+	    }*/
     } else {
-        if (Dot(u_IJ_ML_dt_vec, real3(0, 1, 0)) == 0) {
-            e_IJ_ML_vec = real3(0, 0, 1);
-        } else if (Dot(u_IJ_ML_dt_vec, real3(0, 0, 1)) == 0) {
-            e_IJ_ML_vec = real3(0, 1, 0);
-        } else {
-            std::cout << "Definition of tangent direction failed. Check the problem.";
-        }
+      auto global_tangent_direction1 = chrono::ChVector(0, 1, 0);
+      auto global_tangent_direction2 = chrono::ChVector(0, 0, 1);
+      real dir1_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(),
+						global_tangent_direction1.y(),
+						global_tangent_direction1.z()));
+      real dir2_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(),
+						global_tangent_direction2.y(),
+						global_tangent_direction2.z()));
+      real3 dir1_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(),
+			     global_tangent_direction1.z()) * dir1_val;
+      real3 dir2_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(),
+			     global_tangent_direction2.z()) * dir2_val;
+      auto temp_direction = dir1_vec + dir2_vec;
+      if (Length(temp_direction) != 0) {
+	e_IJ_ML_vec = temp_direction/Length(temp_direction);
+      } else {
+	e_IJ_ML_vec = real3(0, 0, 0);
+      }
     }
     
     // Calculate strain rates
@@ -912,18 +945,18 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     ct_torque[2 * index] = contact_torque_I;
     ct_torque[2 * index + 1] = contact_torque_J;  // cross vector product should give proper sign
 
-    /*
-    * only for validation purposes
+    
+    // only for validation purposes
     std::ofstream DFC_strain_stress;
     DFC_strain_stress.open("DFC_strain_stress.txt", std::ios_base::app);
-    DFC_strain_stress << epsilon_N << ", " << sigma_N_s << ", " << sigma_N_tau << ", " << epsilon_IJ_ML_dt << ", "
-                      << sigma_ML_s << ", " << sigma_ML_tau << ", " << DFC_stress[ctSaveId].z << ", "
-                      << epsilon_IJ_N_dt << " ," << contact_torque_I.x << " ," << contact_torque_I.y << " ,"
-                      << contact_torque_I.z
-                      << "\n";
+    DFC_strain_stress << depth[index] << ", " << epsilon_N << ", " << sigma_N_s
+		      << ", " << sigma_N_tau << ", " << epsilon_IJ_ML_dt << ", "
+                      << sigma_ML_s << ", " << sigma_ML_tau << ", " << DFC_stress[ctSaveId].z
+		      << ", " << epsilon_IJ_N_dt << " ," << contact_torque_I.x << " ,"
+		      << contact_torque_I.y << " ," << contact_torque_I.z << "\n";
     DFC_strain_stress.close();
     DFC_stress[ctSaveId].z += epsilon_IJ_N_dt * dT;
-    */
+    
     return;
 }
 
@@ -1081,15 +1114,19 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
             shape_pairs[i] = pair;
             double temp_R1;
             double temp_R2;
+	    int body1 = data_manager->cd_data->bids_rigid_rigid[i].x;
+	    int body2 = data_manager->cd_data->bids_rigid_rigid[i].y;
             if (data_manager->cd_data->shape_data.typ_rigid[pair.x] == 0) {
-                temp_R1 = data_manager->cd_data->shape_data.sphere_rigid[pair.x];
+	      temp_R1 = (*data_manager->body_list)[body1]->
+		GetCollisionModel()->GetShapeDimensions(0)[0];
             } else {
-                temp_R1 = -1;
+	      temp_R1 = -1;
             }
             if (data_manager->cd_data->shape_data.typ_rigid[pair.y] == 0) {
-                temp_R2 = data_manager->cd_data->shape_data.sphere_rigid[pair.y];
+	      temp_R2 = (*data_manager->body_list)[body2]->
+		GetCollisionModel()->GetShapeDimensions(0)[0];
             } else {
-                temp_R2 = -1;
+	      temp_R2 = -1;
             }
             shape_radiuses[i] = (real3(temp_R1, temp_R2, 0));
         }
