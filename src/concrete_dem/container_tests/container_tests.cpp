@@ -32,7 +32,7 @@ using namespace chrono;
 using namespace chrono::irrlicht;
 using namespace chrono::particlefactory;
 
-std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, double pos, int id){
+std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVector<> vel, int id){
   auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
@@ -46,8 +46,9 @@ std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, double pos, int id){
   ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
   ball->SetMass(mass);
   ball->SetIdentifier(id);
-  ball->SetPos(chrono::ChVector<>(0, 0, pos));
-  ball->SetPos_dt(chrono::ChVector<>(0, -0.04, -0.4));
+  ball->SetPos(pos);
+  ball->SetPos_dt(vel);
+  //ball->SetWvel_par(ChVector<>(0, 0, 0));
   ball->GetCollisionModel()->ClearModel();
   utils::AddSphereGeometry(ball.get(), material, radius);
   ball->SetBodyFixed(false);
@@ -246,13 +247,15 @@ int main(int argc, char* argv[]) {
 
   int ball_number = 0;
   std::vector<std::shared_ptr<ChBody>> created_balls;
-  created_balls.push_back(AddSphere(sys, 0.015, 1));
-  created_balls.push_back(AddSphere(sys, 0.025, 1));
-  created_balls.push_back(AddSphere(sys, 0.035, 1));
-  created_balls.push_back(AddSphere(sys, 0.045, 1));
-  created_balls.push_back(AddSphere(sys, 0.055, 1));
-  created_balls.push_back(AddSphere(sys, 0.065, 1));
-  ball_number += 6;
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.008),
+				    ChVector<>( 0, 0, 0), 1));
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.012, 0.008), ChVector<>(0, 0, 0), 2));
+  created_balls[0]->SetWvel_par(ChVector<>(0, 0, 100));
+  //  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, 0, 0.017), ChVector<>(0, 0, 0), 3));
+  //  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.026, 0.017), ChVector<>(0, 0, 0), 4));
+  //  created_balls.push_back(AddSphere(sys, ChVector<>(0.026, 0, 0.017), ChVector<>(0, 0, 0), 5));
+  //  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.035, 0.017), ChVector<>(0, 0, 0), 6));
+  ball_number += 2;
   std::shared_ptr<ChVisualSystem> vis;
 
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
@@ -304,6 +307,12 @@ int main(int argc, char* argv[]) {
 			<< "Ang_vel x [m/s], "
 			<< "Ang_vel y [m/s], "
 			<< "Ang_vel z [m/s], "
+			<< "Force x [N], "
+			<< "Force y [N], "
+			<< "Force z [N], "
+			<< "Torque x [Nm], "
+			<< "Torque y [Nm], "
+			<< "Torque z [Nm], "
 			<< "Cont defor [m], "
 			<< "Cont force x [N], "
 			<< "Cont force res y [N], "
@@ -324,6 +333,7 @@ int main(int argc, char* argv[]) {
       switch_val = false;
     }
     sys.DoStepDynamics(time_step);
+    simulation_time += time_step;
     vis->EndScene();
     if (register_data) {
       std::shared_ptr<MyContactReport> contact_data_ptr = std::make_shared<MyContactReport>();
@@ -342,6 +352,12 @@ int main(int argc, char* argv[]) {
 	}
 	for (int j = 0; j < 3; j++) {
 	  data_files[i] << created_balls[i]->GetWvel_par()[j] << ", ";
+	}
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetAppliedForce()[j] << ", ";
+	}
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetAppliedTorque()[j] << ", ";
 	}
 	if (!contact_data_ptr->VectorOfCollisionData.empty()) {
 	  bool added_contact_force = false;
@@ -368,7 +384,7 @@ int main(int argc, char* argv[]) {
       }
     }
     
-    simulation_time += time_step;
+    
   }
   return 0;
 }

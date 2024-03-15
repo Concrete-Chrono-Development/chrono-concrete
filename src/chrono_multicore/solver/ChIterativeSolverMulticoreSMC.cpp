@@ -736,6 +736,12 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 u_IJ_dt_vec =  vel_J - vel_I;
     real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
     real3 e_IJ_ML_vec;
+    real3 u_IJ_ML_dt_vec_norm;
+    if (Length(u_IJ_ML_dt_vec) != 0) {
+      u_IJ_ML_dt_vec_norm = u_IJ_ML_dt_vec / Length(u_IJ_ML_dt_vec);
+    } else {
+      u_IJ_ML_dt_vec_norm = real3(0, 0, 0);
+    }
 
     // Calculate versor of tangent direction
     real alfa = acos(Dot(e_IJ_N_vec, real3(1, 0, 0)));  // angle between normal unit vector and global X-axis
@@ -825,7 +831,8 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 
     // Calculate viscous stresses
     real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
-    real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
+    //real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
+    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
 
     // Calculate epsilon_N
     real epsilon_N;
@@ -869,11 +876,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
                 cont_neigh[ctIdUnrolled].y = shape_body_I;
                 cont_neigh[ctIdUnrolled].z = shape_body_J;
 		if (epsilon_N > epsilon_a) {
-		  if (epsilon_N * E_Nm < sigma_t) {
-		    DFC_stress[ctIdUnrolled].x = epsilon_N * E_Nm;  // for mortar initial contact
-		  } else {
-		    DFC_stress[ctIdUnrolled].x = sigma_t;
-		  }
+		  DFC_stress[ctIdUnrolled].x = epsilon_N * E_Nm;  // for mortar initial contact
 		} else {
 		  DFC_stress[ctIdUnrolled].x = epsilon_N * E_Na; // for aggregate initial contact
 		}
@@ -926,13 +929,41 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     }
     
     // Calculate contact force
-    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec + (sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec;
+    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+      (sigma_ML_s) * A_IJ * e_IJ_ML_vec + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm;
 
     // Convert force into the local body frames and calculate induced torques
     //    n' = s' x F' = s' x (A*F)
-    real3 contact_torque_I = Cross(a_I_vec, RotateT((sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec, rot[body_I]));
-    real3 contact_torque_J = Cross(a_J_vec, RotateT((sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec, rot[body_J]));
-
+    real3 contact_torque_I;
+    real3 contact_torque_J;
+    if (R_I != -1 and R_J != -1){
+      contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
+      contact_torque_J = Cross(RotateT(a_J_vec, rot[body_J]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
+    } else if (R_I == -1) {
+      contact_torque_I = Cross(a_I_vec,
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
+      contact_torque_J = Cross(RotateT(a_J_vec, rot[body_J]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
+    } else {
+      contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
+      contact_torque_J = Cross(a_J_vec,
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
+    }
     // Increment stored stiffness stresses and return contact force and torque
     DFC_stress[ctSaveId].x += delta_sigma_N_s;
     DFC_stress[ctSaveId].y += delta_sigma_ML_s;
@@ -943,7 +974,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     ct_force[2 * index] = contact_force;
     ct_force[2 * index + 1] = -contact_force;
     ct_torque[2 * index] = contact_torque_I;
-    ct_torque[2 * index + 1] = contact_torque_J;  // cross vector product should give proper sign
+    ct_torque[2 * index + 1] = -contact_torque_J;
 
     
     // only for validation purposes
