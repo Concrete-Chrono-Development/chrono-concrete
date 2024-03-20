@@ -178,7 +178,7 @@ int main(int argc, char* argv[]) {
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
   ChSystemMulticoreSMC sys;
   //sys.SetCollisionSystemType(collision_type);
-  sys.Set_G_acc(ChVector<>(0, 0, -9.81));
+  sys.Set_G_acc(ChVector<>(0, 0, -9.81)); // -9.81
 
   // concrete and DFC parameters (SI units)
   double containerVol = 0.15 * 0.15 * 0.15;
@@ -247,15 +247,19 @@ int main(int argc, char* argv[]) {
 
   int ball_number = 0;
   std::vector<std::shared_ptr<ChBody>> created_balls;
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.008),
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.08),
 				    ChVector<>( 0, 0, 0), 1));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.012, 0.008), ChVector<>(0, 0, 0), 2));
-  created_balls[0]->SetWvel_par(ChVector<>(0, 0, 100));
-  //  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, 0, 0.017), ChVector<>(0, 0, 0), 3));
-  //  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.026, 0.017), ChVector<>(0, 0, 0), 4));
-  //  created_balls.push_back(AddSphere(sys, ChVector<>(0.026, 0, 0.017), ChVector<>(0, 0, 0), 5));
-  //  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.035, 0.017), ChVector<>(0, 0, 0), 6));
-  ball_number += 2;
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.006, 0.06960769515),
+				    ChVector<>(0, 0, 0), 2));
+  created_balls[0]->SetWvel_par(ChVector<>(0, 0, 0));
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, -0.006,  0.06960769515),
+				    ChVector<>(0, 0, 0), 3));
+  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, 0.000, 0.08), ChVector<>(0, 0, 0), 4));
+  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, 0.006, 0.06960769515),
+				    ChVector<>(0, 0, 0), 5));
+  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, -0.006, 0.06960769515),
+				    ChVector<>(0, 0, 0), 6));
+  ball_number += 3;
   std::shared_ptr<ChVisualSystem> vis;
 
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
@@ -282,7 +286,7 @@ int main(int argc, char* argv[]) {
     };
   emitter.SetVisualisation(vis_irr.get());
   double simulation_time = 0;
-  double time_step = 2e-05;
+  double time_step = 1e-05;
   bool switch_val = false;
 
   // text file for post-processing contact/collision data; first row stores column descriptors
@@ -293,33 +297,33 @@ int main(int argc, char* argv[]) {
       std::string file_name = "ball_" + std::to_string(i) + ".txt";
       const char* file_name_to_pass = file_name.c_str();  // convert type for object constructor
       data_files[i - 1].open(file_name_to_pass);
-      data_files[i - 1] << "Sim time [s] ,"
-			<< "Pos x [m], "
-			<< "Pos y [m], "
-			<< "Pos z [m], "
-			<< "Vel x [m/s], "
-			<< "Vel y [m/s], "
-			<< "Vel z [m/s], "
-			<< "Rot ang [-], "
-			<< "Rot axis x, "
-			<< "Rot axis y, "
-			<< "Rot axis z, "
-			<< "Ang_vel x [m/s], "
-			<< "Ang_vel y [m/s], "
-			<< "Ang_vel z [m/s], "
-			<< "Force x [N], "
-			<< "Force y [N], "
-			<< "Force z [N], "
-			<< "Torque x [Nm], "
-			<< "Torque y [Nm], "
-			<< "Torque z [Nm], "
-			<< "Cont defor [m], "
-			<< "Cont force x [N], "
-			<< "Cont force res y [N], "
-			<< "Cont force res z [N], "
-			<< "Cont torque res x [Nm], "
-			<< "Cont torque res y [Nm], "
-			<< "Cont torque res z [Nm], " 
+      data_files[i - 1] << "Sim time [s],"
+			<< "Pos x [m],"
+			<< "Pos y [m],"
+			<< "Pos z [m],"
+			<< "Vel x [m/s],"
+			<< "Vel y [m/s],"
+			<< "Vel z [m/s],"
+			<< "Rot ang [-],"
+			<< "Rot axis x,"
+			<< "Rot axis y,"
+			<< "Rot axis z,"
+			<< "Ang_vel x [m/s],"
+			<< "Ang_vel y [m/s],"
+			<< "Ang_vel z [m/s],"
+			<< "Force x [N],"
+			<< "Force y [N],"
+			<< "Force z [N],"
+			<< "Torque x [Nm],"
+			<< "Torque y [Nm],"
+			<< "Torque z [Nm],"
+			<< "Cont defor [m],"
+			<< "Cont force x [N],"
+			<< "Cont force res y [N],"
+			<< "Cont force res z [N],"
+			<< "Cont torque res x [Nm],"
+			<< "Cont torque res y [Nm],"
+			<< "Cont torque res z [Nm]," 
 			<< "\n";
     }
   }
@@ -339,42 +343,42 @@ int main(int argc, char* argv[]) {
       std::shared_ptr<MyContactReport> contact_data_ptr = std::make_shared<MyContactReport>();
       sys.GetContactContainer()->ReportAllContacts(contact_data_ptr);
       for (int i = 0; i < ball_number; i++){
-	data_files[i] << simulation_time << ", " ;
+	data_files[i] << simulation_time << "," ;
 	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetPos()[j] << ", ";
+	  data_files[i] << created_balls[i]->GetPos()[j] << ",";
 	}
 	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetPos_dt()[j] << ", ";
+	  data_files[i] << created_balls[i]->GetPos_dt()[j] << ",";
 	}
-	data_files[i] << created_balls[i]->GetRotAngle() << ", ";
+	data_files[i] << created_balls[i]->GetRotAngle() << ",";
 	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetRotAxis()[j] << ", ";
-	}
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetWvel_par()[j] << ", ";
+	  data_files[i] << created_balls[i]->GetRotAxis()[j] << ",";
 	}
 	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetAppliedForce()[j] << ", ";
+	  data_files[i] << created_balls[i]->GetWvel_par()[j] << ",";
 	}
 	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetAppliedTorque()[j] << ", ";
+	  data_files[i] << created_balls[i]->GetAppliedForce()[j] << ",";
+	}
+	for (int j = 0; j < 3; j++) {
+	  data_files[i] << created_balls[i]->GetAppliedTorque()[j] << ",";
 	}
 	if (!contact_data_ptr->VectorOfCollisionData.empty()) {
 	  bool added_contact_force = false;
 	  for (auto e : contact_data_ptr->VectorOfCollisionData){
 	    if (e.contactobjA == created_balls[i]->GetCollisionModel()->GetContactable() ||
 		e.contactobjB == created_balls[i]->GetCollisionModel()->GetContactable()) {
-	      data_files[i] << e.distance << ", ";
+	      data_files[i] << e.distance << ",";
 	      for (int j = 0; j < 3; j++) {
-		data_files[i] << e.react_forces[j] << ", ";
+		data_files[i] << e.react_forces[j] << ",";
 	      }
 	      for (int j = 0; j < 3; j++) {
-		data_files[i] << e.react_torques[j] << ", ";
+		data_files[i] << e.react_torques[j] << ",";
 	      }
-	      data_files[i] << "\n";
-	      added_contact_force = true;
+	      	      added_contact_force = true;
 	    }
 	  }
+	  data_files[i] << "\n";
 	  if (!added_contact_force) {
 	    data_files[i] << "0, 0, 0, 0, 0, 0, 0\n";
 	  }

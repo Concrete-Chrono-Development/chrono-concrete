@@ -699,17 +699,22 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     // Calculate area of contact surface H_IJ is already squared
     real A_IJ = H_IJ * CH_C_PI;
     // Create vectors to express location of the contact area
-    real3 a_I_vec;
-    real3 a_J_vec;
+    real3 a_I_vec, a_J_vec, a_I_vec_loc, a_J_vec_loc;
     if (R_I != -1 && R_J != -1) {
-        a_I_vec = a_I * e_IJ_N_vec;
-        a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_I_vec = a_I * e_IJ_N_vec;
+      a_I_vec_loc = RotateT(a_I_vec, rot[body_I]);  // transform a_I_vec from global to local
+      a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_J_vec_loc = RotateT(a_J_vec, rot[body_J]);
     } else if (R_I == -1) {
-        a_I_vec = TransformParentToLocal(pos[body_I], rot[body_I], pt_I);
-        a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_I_vec_loc = TransformParentToLocal(pos[body_I], rot[body_I], pt_I);
+      a_I_vec = Rotate(a_I_vec_loc, rot[body_I]);  // transform a_I_vec from local to global
+      a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_J_vec_loc = RotateT(a_J_vec, rot[body_J]);
     } else {
-        a_I_vec = a_I * e_IJ_N_vec;
-        a_J_vec = TransformParentToLocal(pos[body_J], rot[body_J], pt_J);
+      a_I_vec = a_I * e_IJ_N_vec;
+      a_I_vec_loc = RotateT(a_I_vec, rot[body_I]);
+      a_J_vec_loc = TransformParentToLocal(pos[body_J], rot[body_J], pt_J);
+      a_J_vec = Rotate(a_J_vec_loc, rot[body_J]);
     }
 
     // Calculate velocities of the contact points (in global frame)
@@ -720,18 +725,10 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 o_body_I = real3(vel[body_I * 6 + 3], vel[body_I * 6 + 4], vel[body_I * 6 + 5]);
     real3 o_body_J = real3(vel[body_J * 6 + 3], vel[body_J * 6 + 4], vel[body_J * 6 + 5]);
     // Calculate relative velocity vectors
-    real3 vel_I;
-    real3 vel_J;
-    if (R_I != -1 && R_J != -1) {
-        vel_I = v_body_I + Cross(o_body_I, a_I_vec);  // both vectors are given in global frame
-        vel_J = v_body_J + Cross(o_body_J, a_J_vec);
-    } else if (R_I == -1) {
-        vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec), rot[body_I]);  // a_I given in local frame (not a sphere)
-        vel_J = v_body_J + Cross(o_body_J, a_J_vec);
-    } else {
-        vel_I = v_body_I + Cross(o_body_I, a_I_vec);
-        vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec), rot[body_J]);
-    }
+    real3 vel_I, vel_J;
+    // vectors o_body_I and o_body_J are given in local coordinate system
+    vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec_loc), rot[body_I]);
+    vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec_loc), rot[body_J]);
     
     real3 u_IJ_dt_vec =  vel_J - vel_I;
     real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
@@ -936,6 +933,10 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     //    n' = s' x F' = s' x (A*F)
     real3 contact_torque_I;
     real3 contact_torque_J;
+    contact_torque_I = Cross(a_I_vec_loc, RotateT(contact_force, rot[body_I]));
+    contact_torque_J = Cross(a_J_vec_loc, RotateT(contact_force, rot[body_J]));
+			     
+    /*
     if (R_I != -1 and R_J != -1){
       contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
 			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
@@ -963,7 +964,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
 				       sigma_ML_s * A_IJ * e_IJ_ML_vec
 				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
-    }
+				       } */
     // Increment stored stiffness stresses and return contact force and torque
     DFC_stress[ctSaveId].x += delta_sigma_N_s;
     DFC_stress[ctSaveId].y += delta_sigma_ML_s;
