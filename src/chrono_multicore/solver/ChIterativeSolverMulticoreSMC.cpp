@@ -914,9 +914,13 @@ void function_CalcDFCForces(int index,               // index of this contact pa
             sigma_N_s = input_sigma_N_s;
             if (abs(input_sigma_ML_s) <= abs(mi_a * sigma_N_s)) {
                 sigma_ML_s = input_sigma_ML_s;
+		GetLog() << "Aggregate to aggregate. Input sigma smaller than friction limit.";
+		GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             else {
                 sigma_ML_s = mi_a * abs(sigma_N_s) * Sign(input_sigma_ML_s);
+		GetLog() << "Aggregate to aggregate. Input sigma greater than friction limit.";
+		GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             delta_sigma_N_s = E_Na * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = alfa_a * E_Na * epsilon_IJ_ML_dt *dT;

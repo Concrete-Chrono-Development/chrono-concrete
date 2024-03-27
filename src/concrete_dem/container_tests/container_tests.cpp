@@ -27,10 +27,56 @@
 #include "chrono/core/ChDistribution.h"
 #include "ParticleEmitterMulticore.h"
 #include "MyContactReport.h"
+#include "chrono/core/ChMathematics.h"
 
 using namespace chrono;
 using namespace chrono::irrlicht;
 using namespace chrono::particlefactory;
+
+void AddSphereLayers(int layer_number, double box_size,
+		     int box_number, double start_height,
+		     ChSystemMulticoreSMC& sys) {
+  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  material->SetYoungModulus(2.05e11);
+  material->SetPoissonRatio(0.3);
+  material->SetRestitution(0.5);
+  material->SetFriction(0.2);
+  double radius = 0.5 * box_size;
+  double density = 797 / (1 + 0.4 + 2.25);
+  double h = 4e-3;
+  double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;
+  for (int i = 0; i < box_number; i++) {
+    for (int j = 0; j < box_number; j++) {
+      for (int k = 0; k < layer_number; k++) {
+	auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+	ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
+	ball->SetMass(mass);
+	ball->SetPos(ChVector<>(i * box_size +  0.5 * box_size - 0.5 * box_size * box_number,
+				j * box_size + 0.5 * box_size - 0.5 * box_size * box_number,
+				start_height + k * box_size));
+	ball->SetPos_dt(ChVector<>(0, 0, 0));
+	//ball->SetWvel_par(ChVector<>(0, 0, 0));
+	ball->GetCollisionModel()->ClearModel();
+	utils::AddSphereGeometry(ball.get(), material, radius);
+	ball->SetBodyFixed(false);
+	ball->SetCollide(true);
+	ball->GetCollisionModel()->BuildModel();
+	ball->SetNoGyroTorque(true);
+	auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
+	sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
+	sphere1->SetOpacity(0.4f);
+	auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
+	sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
+	auto ball_vis = chrono_types::make_shared<ChVisualModel>();
+	ball_vis->AddShape(sphere1);
+	ball_vis->AddShape(sphere2);
+	ball->AddVisualModel(ball_vis);
+	sys.AddBody(ball);
+      }
+    }
+  }
+  return;
+}
 
 std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVector<> vel, int id){
   auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
@@ -178,7 +224,7 @@ int main(int argc, char* argv[]) {
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
   ChSystemMulticoreSMC sys;
   //sys.SetCollisionSystemType(collision_type);
-  sys.Set_G_acc(ChVector<>(0, 0, -9.81)); // -9.81
+  sys.Set_G_acc(ChVector<>(0, 0, -9.81));
 
   // concrete and DFC parameters (SI units)
   double containerVol = 0.15 * 0.15 * 0.15;
@@ -230,36 +276,41 @@ int main(int argc, char* argv[]) {
   // particle emitter
   ParticleEmitterMulticore emitter;
   emitter.SetSystem(&sys);
-  emitter.SetParticlesPerSecond(1e6);
+  emitter.SetParticlesPerSecond(5e5);
   emitter.SetParticleReservoir(9000);
   emitter.SetMortarLayer(h_layer);
-  auto emitter_positions = chrono_types::make_shared<ChRandomParticlePositionRectangleOutlet>();
-  emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.01), QUNIT);
-  emitter_positions->OutletWidth() = 0.135;
-  emitter_positions->OutletHeight() = 0.135;
+  auto emitter_positions = chrono_types::make_shared<
+    ChRandomParticlePositionRectangleOutletInBoxes>();
+  emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.15), QUNIT);
+  emitter_positions->OutletWidth() = 0.12;
+  emitter_positions->OutletHeight() = 0.12;
+  emitter_positions->OutletBoxSize() = 0.025;
   emitter.SetParticlePositioner(emitter_positions);
   auto emitter_rotations = chrono_types::make_shared<ChRandomParticleAlignmentUniform>();
   emitter.SetParticleAligner(emitter_rotations);
   auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
   mvelo->SetDirection(-VECT_Z);
-  mvelo->SetModulusDistribution(0.004);
+  mvelo->SetModulusDistribution(0.04);
   emitter.SetParticleVelocity(mvelo);
-
+  AddSphereLayers(11, 0.016, 10, 0.007, sys);
+  
   int ball_number = 0;
   std::vector<std::shared_ptr<ChBody>> created_balls;
+  /*
   created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.08),
 				    ChVector<>( 0, 0, 0), 1));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.006, 0.06960769515),
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0, 0.017),
 				    ChVector<>(0, 0, 0), 2));
   created_balls[0]->SetWvel_par(ChVector<>(0, 0, 0));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, -0.006,  0.06960769515),
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.026),
 				    ChVector<>(0, 0, 0), 3));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, 0.000, 0.08), ChVector<>(0, 0, 0), 4));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, 0.006, 0.06960769515),
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0, 0.035), ChVector<>(0, 0, 0), 4));
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0, 0.044),
 				    ChVector<>(0, 0, 0), 5));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0.012, -0.006, 0.06960769515),
+  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.012, 0.016),
 				    ChVector<>(0, 0, 0), 6));
-  ball_number += 3;
+  ball_number += 6;
+  */
   std::shared_ptr<ChVisualSystem> vis;
 
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
@@ -286,11 +337,11 @@ int main(int argc, char* argv[]) {
     };
   emitter.SetVisualisation(vis_irr.get());
   double simulation_time = 0;
-  double time_step = 1e-05;
+  double time_step = 1e-06;
   bool switch_val = false;
 
   // text file for post-processing contact/collision data; first row stores column descriptors
-  bool register_data = true;
+  bool register_data = false;
   std::ofstream data_files[ball_number];
   if (register_data) {
     for (int i = 1; i <= ball_number; i++) {
@@ -327,18 +378,25 @@ int main(int argc, char* argv[]) {
 			<< "\n";
     }
   }
+  int step_num = 0;
+  double z_pos = 0.015;
   while (vis->Run()) {
     vis->BeginScene();
     vis->Render();
     vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
     //vis->RenderCOGFrames(1.0);
     if (switch_val) {
-      emitter.EmitParticles(time_step);
-      switch_val = false;
+      if (std::fmod(step_num, 4000) == 0) {
+	emitter.EmitParticles(time_step);
+	z_pos += 0.03;
+	emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, z_pos), QUNIT);
+      }
+      switch_val = true;
     }
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
     vis->EndScene();
+    ++step_num;
     if (register_data) {
       std::shared_ptr<MyContactReport> contact_data_ptr = std::make_shared<MyContactReport>();
       sys.GetContactContainer()->ReportAllContacts(contact_data_ptr);

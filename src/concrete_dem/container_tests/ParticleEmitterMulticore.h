@@ -19,6 +19,8 @@
 #include "chrono/assets/ChSphereShape.h"
 #include "chrono/assets/ChVisualSystem.h"
 #include "chrono_irrlicht/ChVisualSystemIrrlicht.h"
+#include "chrono/core/ChMathematics.h"
+#include "chrono/particlefactory/ChRandomParticlePosition.h"
 
 namespace chrono {
 namespace particlefactory{
@@ -121,6 +123,54 @@ namespace particlefactory{
     
   };
 
+  class ChRandomParticlePositionRectangleOutletInBoxes : public ChRandomParticlePosition {
+  public:
+    ChRandomParticlePositionRectangleOutletInBoxes() {
+      // defaults
+      outlet = CSYSNORM;
+      width = 0.1;
+      height = 0.1;
+      box_size = 0.01;
+    }
+    // Rectangle outlet is divided into "boxes", this function creates random position in a box
+    // each time it is called, it ensures that particles will not be generated to close
+    virtual ChVector<> RandomPosition() override {
+      int x_dir_boxes = width / box_size;
+      int y_dir_boxes = height / box_size;
+      int x_box = ChRandom() * x_dir_boxes;
+      int y_box = ChRandom() * y_dir_boxes;
+      double offset_x = 0;
+      double offset_y = 0;
+      if (ChRandom() > 0.5) {
+	  offset_x = 0.5 * box_size;
+	}
+      if (ChRandom() > 0.5) {
+	  offset_y = 0.5 * box_size;
+	}
+      ChVector<> local_box = ChVector<>(x_box * box_size - offset_x - 0.5 * width,
+					y_box * box_size - offset_y - 0.5 * height, 0);
+      return outlet.TransformLocalToParent(local_box);
+    }
+
+    /// Access the coordinate system of the rectangular outlet.
+    /// The outlet width is on the X direction of this csys, and the
+    /// outlet height is on the Y direction of this csys.
+    ChCoordsys<>& Outlet() { return outlet; }
+
+    /// Access the width of the rectangular outlet, that is on the X axis of the coordinate
+    double& OutletWidth() { return width; }
+
+    /// Access the height of the rectangular outlet, that is on the Y axis of the coordinate
+    double& OutletHeight() { return height; }
+
+    /// Access the box size used to separate particles
+    double& OutletBoxSize() {return box_size;}
+  private:
+    ChCoordsys<> outlet;
+    double width;
+    double height;
+    double box_size;
+  };
 }
 }
 
