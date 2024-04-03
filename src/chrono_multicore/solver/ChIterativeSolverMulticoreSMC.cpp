@@ -809,7 +809,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     
     // Calculate strain rates
     real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
-    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;  // previous code: Length(u_IJ_ML_dt_vec)
+    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;  //previous code:Length(u_IJ_ML_dt_vec)
 
     // Calculate gamma0 prim
     real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
@@ -846,9 +846,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     if (R_I != -1 && R_J != -1) {
       epsilon_a = -log(1 + h / (R_I + R_J - 2*h));
     } else if (R_I == -1) {
-      epsilon_a = -log(1 + h / (R_J - h + t));
+      epsilon_a = -log(1 + (h/2 + t) / (R_J - h));  // changed equation, see notes 29 March
     } else {
-      epsilon_a = -log(1 + h / (R_I - h + t));
+      epsilon_a = -log(1 + (h/2 + t) / (R_I - h));
     }
 
     // Check if contact history already exists. If not, initialize new contact history.
@@ -914,13 +914,13 @@ void function_CalcDFCForces(int index,               // index of this contact pa
             sigma_N_s = input_sigma_N_s;
             if (abs(input_sigma_ML_s) <= abs(mi_a * sigma_N_s)) {
                 sigma_ML_s = input_sigma_ML_s;
-		GetLog() << "Aggregate to aggregate. Input sigma smaller than friction limit.";
-		GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
+		//GetLog() << "Aggregate to aggregate. Input sigma smaller than friction limit.";
+		//GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             else {
                 sigma_ML_s = mi_a * abs(sigma_N_s) * Sign(input_sigma_ML_s);
-		GetLog() << "Aggregate to aggregate. Input sigma greater than friction limit.";
-		GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
+		//GetLog() << "Aggregate to aggregate. Input sigma greater than friction limit.";
+		//GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             delta_sigma_N_s = E_Na * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = alfa_a * E_Na * epsilon_IJ_ML_dt *dT;
@@ -983,6 +983,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 
     
     // only for validation purposes
+    /*
     std::ofstream DFC_strain_stress;
     DFC_strain_stress.open("DFC_strain_stress.txt", std::ios_base::app);
     DFC_strain_stress << depth[index] << ", " << epsilon_N << ", " << sigma_N_s
@@ -992,6 +993,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 		      << contact_torque_I.y << " ," << contact_torque_I.z << "\n";
     DFC_strain_stress.close();
     DFC_stress[ctSaveId].z += epsilon_IJ_N_dt * dT;
+    */
     
     return;
 }

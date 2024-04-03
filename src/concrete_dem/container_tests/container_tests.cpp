@@ -28,31 +28,68 @@
 #include "ParticleEmitterMulticore.h"
 #include "MyContactReport.h"
 #include "chrono/core/ChMathematics.h"
+#include "WriteParticlesVTK.h"
+#include "chrono_thirdparty/rapidjson/prettywriter.h"
+#include "chrono_thirdparty/rapidjson/stringbuffer.h"
+#include "chrono_thirdparty/filesystem/path.h"
 
 using namespace chrono;
 using namespace chrono::irrlicht;
 using namespace chrono::particlefactory;
 
-void AddSphereLayers(int layer_number, double box_size,
-		     int box_number, double start_height,
-		     ChSystemMulticoreSMC& sys) {
+// define a class for concrete particle distribution
+class DFCParticleDistr : public ChDistribution {
+public:
+  DFCParticleDistr(double min_size, double max_size, double mortar_layer, double mq)
+    : d_0(min_size), d_a(max_size), h(mortar_layer), q(mq) {
+  }
+  virtual double GetRandom() override {
+    double P = ChRandom();
+    double aggregate_D = d_0 * pow((1 - P * (1 - pow(d_0, q)/pow(d_a, q))), (-1/q));
+    return aggregate_D + 2 * h;
+  }
+  double GetHLayer() {return h;}
+  double GetMaxSize() {return d_a;}
+private:
+  double d_0;
+  double d_a;
+  double h;
+  double q;
+};
+
+void AddSphereLayers(int layer_number, int box_number, double start_height,
+		     ChSystemMulticoreSMC& sys, DFCParticleDistr d_param) {
   auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
   material->SetFriction(0.2);
-  double radius = 0.5 * box_size;
+  double radius = 0;  0.5 * d_param.GetRandom();
+  double box_size = d_param.GetMaxSize() + 0.001;  // max aggregate size + 1 mm for safety
   double density = 797 / (1 + 0.4 + 2.25);
-  double h = 4e-3;
-  double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;
-  for (int i = 0; i < box_number; i++) {
-    for (int j = 0; j < box_number; j++) {
-      for (int k = 0; k < layer_number; k++) {
+  double h = d_param.GetHLayer();
+  double mass = 0;
+  float shift_x[4] = {box_size/2, 0, -box_size/2, 0};
+  float shift_y[4] = {0, box_size/2, 0, -box_size/2};
+  int l = -1;
+  for (int k = 0; k < layer_number; ++k) {
+    if (l < 4){
+      ++l;
+    }
+    else {
+      l = 0;
+    }
+    for (int j = 0; j < box_number; ++j) {
+      for (int i = 0; i < box_number; ++i) {
 	auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+	radius = 0.5 * d_param.GetRandom();
+	double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;
 	ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
 	ball->SetMass(mass);
-	ball->SetPos(ChVector<>(i * box_size +  0.5 * box_size - 0.5 * box_size * box_number,
-				j * box_size + 0.5 * box_size - 0.5 * box_size * box_number,
+	ball->SetPos(ChVector<>(i * box_size +  0.5 * box_size - 0.5 * box_size * box_number
+				+ shift_x[l],
+				j * box_size + 0.5 * box_size - 0.5 * box_size * box_number
+				+ shift_y[l],
 				start_height + k * box_size));
 	ball->SetPos_dt(ChVector<>(0, 0, 0));
 	//ball->SetWvel_par(ChVector<>(0, 0, 0));
@@ -196,31 +233,68 @@ std::vector<std::shared_ptr<ChBody>> create_container(ChSystemMulticoreSMC* sys,
   collection_of_walls.push_back(side_wall_1);
   collection_of_walls.push_back(side_wall_2);
   collection_of_walls.push_back(side_wall_3);
+  collection_of_walls.push_back(side_wall_4);
   return collection_of_walls;
 }
 
-// define a class for concrete particle distribution
-class DFCParticleDistr : public ChDistribution {
-public:
-  DFCParticleDistr(double min_size, double max_size, double mortar_layer, double mq)
-    : d_0(max_size), d_a(min_size), h(mortar_layer), q(mq) {
+// function to write reaction forces acting on container walls
+void write_wall_forces(std::vector<std::shared_ptr<ChBody>> walls, std::string file_name,
+		       double time){
+  std::vector<std::string> wall_names {"Bottom wall: ", "Wall 1: ", "Wall 2: ",
+				       "Wall 3: ", "Wall 4: "};
+  std::ofstream file_to_write;
+  file_to_write.open(file_name, std::ios_base::app);
+  file_to_write << "Current time step: " << time << "\n";
+  for (int i = 0; i < 5; ++i) {
+    ChVector<> temp_force = walls[i]->GetAppliedForce();
+    file_to_write << wall_names[i] << "x: " << temp_force.x() << " y: " << temp_force.y()
+		  << " z: " << temp_force.z() << "\n";
   }
-  virtual double GetRandom() override {
-    double P = ChRandom();
-    double aggregate_D = d_0 * pow((1 - P * (1 - pow(d_0, q)/pow(d_a, q))), (-1/q));
-    return aggregate_D + 2 * h;
+  file_to_write << "\n";
+  file_to_write.close();
+}
+
+// function checking, if particles are inside the box
+bool any_particle_inside(ChSystemMulticore& sys){
+  auto body_list = sys.Get_bodylist();
+  int particles_inside = 0;
+  for (auto body : body_list) {
+    if ((body->GetPos()).Length() < 0.15)
+      ++particles_inside;
+    if (particles_inside > 10)
+      return true;
   }
-private:
-  double d_0;
-  double d_a;
-  double h;
-  double q;
-};
+   return false;
+}
+
+// function printing current energy status
+void print_energy_status(ChSystemMulticore& sys){
+  float total_trans_kin_e = 0;
+  float total_rot_kin_e = 0;
+  auto body_list = sys.Get_bodylist();
+  for (auto body : body_list) {
+    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+      continue;
+    auto mass = body->GetMass();
+    auto inertia = body->GetInertiaXX();
+    float trans_kin_e = 0;  // transnational kinetic energy
+    float rot_kin_e = 0;  // rotational kinetic energy
+    ChVector<float> vel_t = body->GetPos_dt();
+    ChVector<float> vel_r = body->GetWvel_par();
+    trans_kin_e = 0.5 * mass * (pow(vel_t.x(), 2) + pow(vel_t.y(), 2) + pow(vel_t.z(), 2));
+    rot_kin_e = 0.5 * (inertia.x()*pow(vel_r.x(), 2) + inertia.y()*pow(vel_r.y(), 2)
+		       + inertia.z()*pow(vel_r.z(), 2));
+    total_trans_kin_e += trans_kin_e;
+    total_rot_kin_e += rot_kin_e;
+  }
+  GetLog() << "Total transnational kinetic energy: " << total_trans_kin_e;
+  GetLog() << " Total rotational kinetic energy: " << total_rot_kin_e << "\n";
+}
 
 int main(int argc, char* argv[]) {
   GetLog() << "Test application for implementation of DFC model in chrono::multicore\n";
-  GetLog() << "Based on open source library projectchrono.org\nChrono version: "
-	   << CHRONO_VERSION << "\n\n\n";
+  GetLog() << "Based on open source library projectchrono.org Chrono version: "
+	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
   ChSystemMulticoreSMC sys;
   //sys.SetCollisionSystemType(collision_type);
@@ -263,190 +337,57 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 0.0005e6;
   sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;
   sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;
-  sys.GetSettings()->dfc_contact_param.t = 4e-3;
+  sys.GetSettings()->dfc_contact_param.t = 4e-3/2;
   sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
-  real tolerance = 1e-3;
-  uint max_iteration = 100;
-  sys.GetSettings()->solver.max_iteration_bilateral = max_iteration;
-  sys.GetSettings()->solver.tolerance = tolerance;
+  //real tolerance = 1e-3;
+  //uint max_iteration = 100;
+  //sys.GetSettings()->solver.max_iteration_bilateral = max_iteration;
+  //sys.GetSettings()->solver.tolerance = tolerance;
   sys.GetSettings()->collision.narrowphase_algorithm = collision::ChNarrowphase::Algorithm::HYBRID;
   sys.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
   std::vector<std::shared_ptr<ChBody>> container_walls = create_container(&sys, 0.15);
-    
-  // particle emitter
-  ParticleEmitterMulticore emitter;
-  emitter.SetSystem(&sys);
-  emitter.SetParticlesPerSecond(5e5);
-  emitter.SetParticleReservoir(9000);
-  emitter.SetMortarLayer(h_layer);
-  auto emitter_positions = chrono_types::make_shared<
-    ChRandomParticlePositionRectangleOutletInBoxes>();
-  emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, 0.15), QUNIT);
-  emitter_positions->OutletWidth() = 0.12;
-  emitter_positions->OutletHeight() = 0.12;
-  emitter_positions->OutletBoxSize() = 0.025;
-  emitter.SetParticlePositioner(emitter_positions);
-  auto emitter_rotations = chrono_types::make_shared<ChRandomParticleAlignmentUniform>();
-  emitter.SetParticleAligner(emitter_rotations);
-  auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
-  mvelo->SetDirection(-VECT_Z);
-  mvelo->SetModulusDistribution(0.04);
-  emitter.SetParticleVelocity(mvelo);
-  AddSphereLayers(11, 0.016, 10, 0.007, sys);
   
-  int ball_number = 0;
-  std::vector<std::shared_ptr<ChBody>> created_balls;
-  /*
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.08),
-				    ChVector<>( 0, 0, 0), 1));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0, 0.017),
-				    ChVector<>(0, 0, 0), 2));
-  created_balls[0]->SetWvel_par(ChVector<>(0, 0, 0));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0,  0.026),
-				    ChVector<>(0, 0, 0), 3));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0, 0.035), ChVector<>(0, 0, 0), 4));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0, 0.044),
-				    ChVector<>(0, 0, 0), 5));
-  created_balls.push_back(AddSphere(sys, ChVector<>(0, 0.012, 0.016),
-				    ChVector<>(0, 0, 0), 6));
-  ball_number += 6;
-  */
-  std::shared_ptr<ChVisualSystem> vis;
-
-  auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
-  vis_irr->AttachSystem(&sys);
-  vis_irr->SetWindowSize(800, 600);
-  vis_irr->SetWindowTitle("SMC callbacks");
-  vis_irr->Initialize();
-  vis_irr->AddLogo();
-  vis_irr->AddSkyBox();
-  vis_irr->AddCamera(ChVector<>(0.5, 0.5, 1));
-  vis_irr->AddTypicalLights();
-  vis = vis_irr;
-  class MyCreatorForAll : public ChRandomShapeCreator::AddBodyCallback {
-  public:
-    virtual void OnAddBody(std::shared_ptr<ChBody> mbody,
-                           ChCoordsys<> mcoords,
-                           ChRandomShapeCreator& mcreator) override {
-      vis->BindItem(mbody);
-      mbody->SetNoGyroTorque(true);
-      sys->AddBody(mbody);
-    }
-    ChVisualSystemIrrlicht* vis;
-    ChSystemMulticoreSMC* sys;
-    };
-  emitter.SetVisualisation(vis_irr.get());
+  AddSphereLayers(20, 12, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  
   double simulation_time = 0;
   double time_step = 1e-06;
+  // time interval for data storage expressed in simulation steps
+  int save_step =  1e-3 / time_step;  
   bool switch_val = false;
-
-  // text file for post-processing contact/collision data; first row stores column descriptors
-  bool register_data = false;
-  std::ofstream data_files[ball_number];
-  if (register_data) {
-    for (int i = 1; i <= ball_number; i++) {
-      std::string file_name = "ball_" + std::to_string(i) + ".txt";
-      const char* file_name_to_pass = file_name.c_str();  // convert type for object constructor
-      data_files[i - 1].open(file_name_to_pass);
-      data_files[i - 1] << "Sim time [s],"
-			<< "Pos x [m],"
-			<< "Pos y [m],"
-			<< "Pos z [m],"
-			<< "Vel x [m/s],"
-			<< "Vel y [m/s],"
-			<< "Vel z [m/s],"
-			<< "Rot ang [-],"
-			<< "Rot axis x,"
-			<< "Rot axis y,"
-			<< "Rot axis z,"
-			<< "Ang_vel x [m/s],"
-			<< "Ang_vel y [m/s],"
-			<< "Ang_vel z [m/s],"
-			<< "Force x [N],"
-			<< "Force y [N],"
-			<< "Force z [N],"
-			<< "Torque x [Nm],"
-			<< "Torque y [Nm],"
-			<< "Torque z [Nm],"
-			<< "Cont defor [m],"
-			<< "Cont force x [N],"
-			<< "Cont force res y [N],"
-			<< "Cont force res z [N],"
-			<< "Cont torque res x [Nm],"
-			<< "Cont torque res y [Nm],"
-			<< "Cont torque res z [Nm]," 
-			<< "\n";
-    }
-  }
+  int saved_steps = 0;  // serves as index for file name generation
+  bool register_data = true;
   int step_num = 0;
-  double z_pos = 0.015;
-  while (vis->Run()) {
-    vis->BeginScene();
-    vis->Render();
-    vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
-    //vis->RenderCOGFrames(1.0);
-    if (switch_val) {
-      if (std::fmod(step_num, 4000) == 0) {
-	emitter.EmitParticles(time_step);
-	z_pos += 0.03;
-	emitter_positions->Outlet() = ChCoordsys<>(ChVector<>(0, 0, z_pos), QUNIT);
-      }
-      switch_val = true;
-    }
+  bool continue_simulation = true;
+
+  std::string out_dir = "OUT_VTK";
+  if (!filesystem::create_directory(filesystem::path(out_dir))) {
+    std::cerr << "Error creating directory" << out_dir << std::endl;
+    return 1;
+  }
+  std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
+  
+  while (continue_simulation) {
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
-    vis->EndScene();
-    ++step_num;
     if (register_data) {
-      std::shared_ptr<MyContactReport> contact_data_ptr = std::make_shared<MyContactReport>();
-      sys.GetContactContainer()->ReportAllContacts(contact_data_ptr);
-      for (int i = 0; i < ball_number; i++){
-	data_files[i] << simulation_time << "," ;
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetPos()[j] << ",";
-	}
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetPos_dt()[j] << ",";
-	}
-	data_files[i] << created_balls[i]->GetRotAngle() << ",";
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetRotAxis()[j] << ",";
-	}
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetWvel_par()[j] << ",";
-	}
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetAppliedForce()[j] << ",";
-	}
-	for (int j = 0; j < 3; j++) {
-	  data_files[i] << created_balls[i]->GetAppliedTorque()[j] << ",";
-	}
-	if (!contact_data_ptr->VectorOfCollisionData.empty()) {
-	  bool added_contact_force = false;
-	  for (auto e : contact_data_ptr->VectorOfCollisionData){
-	    if (e.contactobjA == created_balls[i]->GetCollisionModel()->GetContactable() ||
-		e.contactobjB == created_balls[i]->GetCollisionModel()->GetContactable()) {
-	      data_files[i] << e.distance << ",";
-	      for (int j = 0; j < 3; j++) {
-		data_files[i] << e.react_forces[j] << ",";
-	      }
-	      for (int j = 0; j < 3; j++) {
-		data_files[i] << e.react_torques[j] << ",";
-	      }
-	      	      added_contact_force = true;
-	    }
-	  }
-	  data_files[i] << "\n";
-	  if (!added_contact_force) {
-	    data_files[i] << "0, 0, 0, 0, 0, 0, 0\n";
-	  }
-	} else {
-	  data_files[i] << "0, 0, 0, 0, 0, 0, 0\n";
-	}
+      if (std::fmod(step_num, save_step) == 0) {
+	std::string file_name = out_dir + generate_file_name("/particle_time_steps", saved_steps);
+	write_particles_VTK(sys, file_name);
+	++saved_steps;
+	write_wall_forces(container_walls, reaction_forces_file, simulation_time);
+	GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
       }
     }
-    
-    
+    if (std::fmod(step_num, 10) == 0){
+      print_energy_status(sys);
+      if (!any_particle_inside(sys)){
+	continue_simulation = false;
+	GetLog() << "Simulation stopped. No particles in container.";
+      }
+      if (simulation_time > 1)
+	continue_simulation = false;
+    }
+    ++step_num;
   }
   return 0;
 }
