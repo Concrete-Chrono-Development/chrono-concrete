@@ -631,7 +631,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         mi_a = param.mi_a;
         t = 0;
     } else {  // any of the contacting shapes is not a sphere
-        E_Nm = param.E_Na_s;
+        E_Nm = param.E_Nm_s;
         E_Na = param.E_Na_s;
         h = param.h;
         alfa_a = param.alfa_a_s;
@@ -679,8 +679,13 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         l_IJ = R_I + depth[index] + t;
     }
 
-    // Calculate versor o normal direction
-    auto e_IJ_N_vec = (pos[body_J] - pos[body_I]) / l_IJ;
+    // Calculate versor of normal direction, pointing from I to J
+    real3 e_IJ_N_vec;
+    if (R_I != -1 && R_J != -1) {
+      e_IJ_N_vec = (pos[body_J] - pos[body_I]) / l_IJ;
+    } else {
+      e_IJ_N_vec = -normal[index];
+    }
     // Calculate distance from center o body I to contact surface
     real a_I;
     if (R_I != -1 && R_J != -1) {
@@ -688,22 +693,28 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     } else {
         a_I = l_IJ - t;
     }
+
     // Calculate squared radius of contact surface 
     real H_IJ = Pow(R_I, 2) - Pow(a_I, 2);
     // Calculate area of contact surface H_IJ is already squared
     real A_IJ = H_IJ * CH_C_PI;
     // Create vectors to express location of the contact area
-    real3 a_I_vec;
-    real3 a_J_vec;
+    real3 a_I_vec, a_J_vec, a_I_vec_loc, a_J_vec_loc;
     if (R_I != -1 && R_J != -1) {
-        a_I_vec = a_I * e_IJ_N_vec;
-        a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_I_vec = a_I * e_IJ_N_vec;
+      a_I_vec_loc = RotateT(a_I_vec, rot[body_I]);  // transform a_I_vec from global to local
+      a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_J_vec_loc = RotateT(a_J_vec, rot[body_J]);
     } else if (R_I == -1) {
-        a_I_vec = TransformParentToLocal(pos[body_I], rot[body_I], pt_I);
-        a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_I_vec_loc = TransformParentToLocal(pos[body_I], rot[body_I], pt_I);
+      a_I_vec = Rotate(a_I_vec_loc, rot[body_I]);  // transform a_I_vec from local to global
+      a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+      a_J_vec_loc = RotateT(a_J_vec, rot[body_J]);
     } else {
-        a_I_vec = a_I * e_IJ_N_vec;
-        a_J_vec = TransformParentToLocal(pos[body_J], rot[body_J], pt_J);
+      a_I_vec = a_I * e_IJ_N_vec;
+      a_I_vec_loc = RotateT(a_I_vec, rot[body_I]);
+      a_J_vec_loc = TransformParentToLocal(pos[body_J], rot[body_J], pt_J);
+      a_J_vec = Rotate(a_J_vec_loc, rot[body_J]);
     }
 
     // Calculate velocities of the contact points (in global frame)
@@ -714,20 +725,91 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 o_body_I = real3(vel[body_I * 6 + 3], vel[body_I * 6 + 4], vel[body_I * 6 + 5]);
     real3 o_body_J = real3(vel[body_J * 6 + 3], vel[body_J * 6 + 4], vel[body_J * 6 + 5]);
     // Calculate relative velocity vectors
-    real3 vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec), rot[body_I]);
-    real3 vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec), rot[body_J]);
+    real3 vel_I, vel_J;
+    // vectors o_body_I and o_body_J are given in local coordinate system
+    vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec_loc), rot[body_I]);
+    vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec_loc), rot[body_J]);
+    
     real3 u_IJ_dt_vec =  vel_J - vel_I;
     real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
     real3 e_IJ_ML_vec;
-    if (Length(u_IJ_ML_dt_vec) != 0){
-        e_IJ_ML_vec = u_IJ_ML_dt_vec/Length(u_IJ_ML_dt_vec);
+    real3 u_IJ_ML_dt_vec_norm;
+    if (Length(u_IJ_ML_dt_vec) != 0) {
+      u_IJ_ML_dt_vec_norm = u_IJ_ML_dt_vec / Length(u_IJ_ML_dt_vec);
+    } else {
+      u_IJ_ML_dt_vec_norm = real3(0, 0, 0);
     }
-    else {
-        e_IJ_ML_vec = real3(0, 0, 0);
+
+    // Calculate versor of tangent direction
+    real alfa = acos(Dot(e_IJ_N_vec, real3(1, 0, 0)));  // angle between normal unit vector and global X-axis
+    if (alfa != 0) {
+        real3 rotation_axis = Cross(e_IJ_N_vec, real3(1, 0, 0));
+        if (Length(rotation_axis) != 0){    // normalize rotation axis
+            rotation_axis = rotation_axis/Length(rotation_axis);
+        } else {
+            rotation_axis = real3(0, 0, 0);
+        }
+        chrono::ChQuaternion<real> transformation_quaternion;
+        transformation_quaternion.Q_from_AngAxis(alfa,
+                                                 chrono::ChVector(rotation_axis.x, rotation_axis.y, rotation_axis.z));
+        auto global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector(1, 0, 0));
+        if (global_normal_direction.x() != e_IJ_N_vec.x || global_normal_direction.y() != e_IJ_N_vec.y ||
+            global_normal_direction.z() != e_IJ_N_vec.z) {
+            // the difference between calculated global normal direction and vector e_IJ_N_vec results from wrong sign
+            transformation_quaternion.Q_from_AngAxis(-alfa, chrono::ChVector(rotation_axis.x, rotation_axis.y, rotation_axis.z));
+            global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector(1, 0, 0));
+        }
+        auto global_tangent_direction1 = transformation_quaternion.Rotate(chrono::ChVector(0, 1, 0));
+        auto global_tangent_direction2 = transformation_quaternion.Rotate(chrono::ChVector(0, 0, 1));
+	real dir1_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(),
+						  global_tangent_direction1.y(),
+						  global_tangent_direction1.z()));
+	real dir2_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(),
+						  global_tangent_direction2.y(),
+						  global_tangent_direction2.z()));
+	real3 dir1_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(),
+			       global_tangent_direction1.z()) * dir1_val;
+	real3 dir2_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(),
+			       global_tangent_direction2.z()) * dir2_val;
+	auto temp_direction = dir1_vec + dir2_vec;
+	if (Length(temp_direction) != 0) {
+	  e_IJ_ML_vec = temp_direction/Length(temp_direction);
+	} else {
+	  e_IJ_ML_vec = real3(0, 0, 0);
+	}
+	/*
+        if (Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z())) == 0) {
+            e_IJ_ML_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z());
+        }
+        else if(Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z())) == 0){ 
+            e_IJ_ML_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z());
+        } else {
+            std::cout << "Definition of tangent direction failed. Check the problem.";
+	    }*/
+    } else {
+      auto global_tangent_direction1 = chrono::ChVector(0, 1, 0);
+      auto global_tangent_direction2 = chrono::ChVector(0, 0, 1);
+      real dir1_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(),
+						global_tangent_direction1.y(),
+						global_tangent_direction1.z()));
+      real dir2_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(),
+						global_tangent_direction2.y(),
+						global_tangent_direction2.z()));
+      real3 dir1_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(),
+			     global_tangent_direction1.z()) * dir1_val;
+      real3 dir2_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(),
+			     global_tangent_direction2.z()) * dir2_val;
+      auto temp_direction = dir1_vec + dir2_vec;
+      if (Length(temp_direction) != 0) {
+	e_IJ_ML_vec = temp_direction/Length(temp_direction);
+      } else {
+	e_IJ_ML_vec = real3(0, 0, 0);
+      }
     }
-    // Calculata strain rates
+    
+    // Calculate strain rates
     real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
-    real epsilon_IJ_ML_dt = Length(u_IJ_ML_dt_vec) / l_IJ;
+    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;  //previous code:Length(u_IJ_ML_dt_vec)
 
     // Calculate gamma0 prim
     real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
@@ -746,7 +828,8 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 
     // Calculate viscous stresses
     real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
-    real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
+    //real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
+    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
 
     // Calculate epsilon_N
     real epsilon_N;
@@ -756,6 +839,16 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         epsilon_N = log(l_IJ/ (R_J + t - h/2));
     } else {
         epsilon_N = log(l_IJ/ (R_I + t - h/2));
+    }
+
+    // Calculate epsilon_a
+    real epsilon_a;
+    if (R_I != -1 && R_J != -1) {
+      epsilon_a = -log(1 + h / (R_I + R_J - 2*h));
+    } else if (R_I == -1) {
+      epsilon_a = -log(1 + (h/2 + t) / (R_J - h));  // changed equation, see notes 29 March
+    } else {
+      epsilon_a = -log(1 + (h/2 + t) / (R_I - h));
     }
 
     // Check if contact history already exists. If not, initialize new contact history.
@@ -779,7 +872,11 @@ void function_CalcDFCForces(int index,               // index of this contact pa
                 cont_neigh[ctIdUnrolled].x = body_J;
                 cont_neigh[ctIdUnrolled].y = shape_body_I;
                 cont_neigh[ctIdUnrolled].z = shape_body_J;
-                DFC_stress[ctIdUnrolled].x = 0;
+		if (epsilon_N > epsilon_a) {
+		  DFC_stress[ctIdUnrolled].x = epsilon_N * E_Nm;  // for mortar initial contact
+		} else {
+		  DFC_stress[ctIdUnrolled].x = epsilon_N * E_Na; // for aggregate initial contact
+		}
                 DFC_stress[ctIdUnrolled].y = 0;
                 DFC_stress[ctIdUnrolled].z = 0;
                 break;
@@ -808,26 +905,22 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         delta_sigma_ML_s = 0;
     }
     else {
-        real epsilon_a;
-        if (R_I != -1 && R_J != -1) {
-            epsilon_a = -log(1 + h / (R_I + R_J - 2*h));
-        } else if (R_I == -1) {
-            epsilon_a = -log(1 + h / (R_J - h + t));
-        } else {
-            epsilon_a = -log(1 + h / (R_I - h + t));
-        }
-        if (epsilon_N >= epsilon_a){
+        if (epsilon_N > epsilon_a){
             sigma_N_s = input_sigma_N_s;
             sigma_ML_s = 0;
             delta_sigma_N_s = E_Nm * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = 0;
         } else {
             sigma_N_s = input_sigma_N_s;
-            if (input_sigma_ML_s <= mi_a * sigma_N_s) {
+            if (abs(input_sigma_ML_s) <= abs(mi_a * sigma_N_s)) {
                 sigma_ML_s = input_sigma_ML_s;
+		//GetLog() << "Aggregate to aggregate. Input sigma smaller than friction limit.";
+		//GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             else {
-                sigma_ML_s = mi_a * sigma_N_s;
+                sigma_ML_s = mi_a * abs(sigma_N_s) * Sign(input_sigma_ML_s);
+		//GetLog() << "Aggregate to aggregate. Input sigma greater than friction limit.";
+		//GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             delta_sigma_N_s = E_Na * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = alfa_a * E_Na * epsilon_IJ_ML_dt *dT;
@@ -837,13 +930,45 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     }
     
     // Calculate contact force
-    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec + (sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec;
+    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+      (sigma_ML_s) * A_IJ * e_IJ_ML_vec + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm;
 
     // Convert force into the local body frames and calculate induced torques
     //    n' = s' x F' = s' x (A*F)
-    real3 contact_torque_I = Cross(a_I_vec, RotateT((sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec, rot[body_I]));
-    real3 contact_torque_J = Cross(a_J_vec, RotateT((sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec, rot[body_J]));
-
+    real3 contact_torque_I;
+    real3 contact_torque_J;
+    contact_torque_I = Cross(a_I_vec_loc, RotateT(contact_force, rot[body_I]));
+    contact_torque_J = Cross(a_J_vec_loc, RotateT(contact_force, rot[body_J]));
+			     
+    /*
+    if (R_I != -1 and R_J != -1){
+      contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
+      contact_torque_J = Cross(RotateT(a_J_vec, rot[body_J]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
+    } else if (R_I == -1) {
+      contact_torque_I = Cross(a_I_vec,
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
+      contact_torque_J = Cross(RotateT(a_J_vec, rot[body_J]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
+    } else {
+      contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
+      contact_torque_J = Cross(a_J_vec,
+			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+				       sigma_ML_s * A_IJ * e_IJ_ML_vec
+				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
+				       } */
     // Increment stored stiffness stresses and return contact force and torque
     DFC_stress[ctSaveId].x += delta_sigma_N_s;
     DFC_stress[ctSaveId].y += delta_sigma_ML_s;
@@ -856,6 +981,20 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     ct_torque[2 * index] = contact_torque_I;
     ct_torque[2 * index + 1] = -contact_torque_J;
 
+    
+    // only for validation purposes
+    /*
+    std::ofstream DFC_strain_stress;
+    DFC_strain_stress.open("DFC_strain_stress.txt", std::ios_base::app);
+    DFC_strain_stress << depth[index] << ", " << epsilon_N << ", " << sigma_N_s
+		      << ", " << sigma_N_tau << ", " << epsilon_IJ_ML_dt << ", "
+                      << sigma_ML_s << ", " << sigma_ML_tau << ", " << DFC_stress[ctSaveId].z
+		      << ", " << epsilon_IJ_N_dt << " ," << contact_torque_I.x << " ,"
+		      << contact_torque_I.y << " ," << contact_torque_I.z << "\n";
+    DFC_strain_stress.close();
+    DFC_stress[ctSaveId].z += epsilon_IJ_N_dt * dT;
+    */
+    
     return;
 }
 
@@ -1013,15 +1152,19 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
             shape_pairs[i] = pair;
             double temp_R1;
             double temp_R2;
+	    int body1 = data_manager->cd_data->bids_rigid_rigid[i].x;
+	    int body2 = data_manager->cd_data->bids_rigid_rigid[i].y;
             if (data_manager->cd_data->shape_data.typ_rigid[pair.x] == 0) {
-                temp_R1 = data_manager->cd_data->shape_data.sphere_rigid[pair.x];
+	      temp_R1 = (*data_manager->body_list)[body1]->
+		GetCollisionModel()->GetShapeDimensions(0)[0];
             } else {
-                temp_R1 = -1;
+	      temp_R1 = -1;
             }
             if (data_manager->cd_data->shape_data.typ_rigid[pair.y] == 0) {
-                temp_R2 = data_manager->cd_data->shape_data.sphere_rigid[pair.y];
+	      temp_R2 = (*data_manager->body_list)[body2]->
+		GetCollisionModel()->GetShapeDimensions(0)[0];
             } else {
-                temp_R2 = -1;
+	      temp_R2 = -1;
             }
             shape_radiuses[i] = (real3(temp_R1, temp_R2, 0));
         }

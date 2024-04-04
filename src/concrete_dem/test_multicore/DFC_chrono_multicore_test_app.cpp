@@ -105,10 +105,10 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
     collision::ChCollisionModel::SetDefaultSuggestedEnvelope(0.004);
 
     double gap_between_sphere_1_2 = 0.000;
-    double h = 2.5e-3;
+    double h = 3e-3;
 
     // Define balls
-    double radius = 0.01;                                          // in meters, I have doubt about used units
+    double radius = 0.005;                                          // in meters, I have doubt about used units
     double density = 797 / (1 + 0.4 + 2.25);
     double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;  // calculated (volume, density), in kg, average
     for (int i = 0; i < ball_number; i++) {
@@ -120,9 +120,13 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
         if (i == 0) {
             ball->SetPos(chrono::ChVector<>(0, 0, 0));
             ball->SetPos_dt(chrono::ChVector<>(initial_velocity, 0, 0));
+            ball->SetRot(QUNIT);
+            ball->SetWvel_par(chrono::ChVector<>(0, 0, 0));
         } else {
-            ball->SetPos(chrono::ChVector<>(i *( 2 * radius - h ) + gap_between_sphere_1_2, 0, 0));
+            //ball->SetPos(chrono::ChVector<>(-i *( 2 * radius - h ) + gap_between_sphere_1_2, 0, 0));
+            ball->SetPos(chrono::ChVector<>(-2 * radius + 0.003, 0, 0));
             ball->SetPos_dt(chrono::ChVector<>(0, 0, 0));
+            ball->SetRot(QUNIT);
         }
         ball->GetCollisionModel()->ClearModel();  // CollisionModel is a class which defines the geometric model used
                                                   // for collision detection (it has simple shapes and mesh)
@@ -150,20 +154,20 @@ int main(int argc, char* argv[]) {
     GetLog() << "Test application for verification the DFC contact force model in chrono::multicore\n";
     GetLog() << "Based on open source library projectchrono.org\nChrono version: " << CHRONO_VERSION << "\n\n";
 
-	// Set path to Chrono data directory
+    // Set path to Chrono data directory
     chrono::SetChronoDataPath(CHRONO_DATA_DIR);
 
     // Simulation and rendering time-step
-    double time_step = 2e-4;
-    double out_step = 2e-2;
+    double time_step = 5e-5;
+    double out_step = 1e-2;
 
-	// Create the physical system, argument use_material_properties = true defines how parameters
+    // Create the physical system, argument use_material_properties = true defines how parameters
     // of the contact model are calcultated (true means that Young modulus and Poisson ratio
     // are used to calculate kn, not relevant in this case as they will be determined by contact force implementation
 
     ChSystemMulticoreSMC sys;  // ChSystemSMC is a class, create object of this class, this system is using
-                                    // material properties to calculate contact force parameters
-    //double time_step = 1e-6;
+                               // material properties to calculate contact force parameters
+    // double time_step = 1e-6;
     int frame_skip = 100;
     uint max_iteration = 100;
     chrono::real tolerance = 1e-3;
@@ -178,36 +182,37 @@ int main(int argc, char* argv[]) {
     sys.GetSettings()->collision.bins_per_axis = chrono::vec3(10, 10, 10);
 
     // Set DFC contact model parameters
-    sys.GetSettings()->dfc_contact_param.E_Nm = 0.05e6; /// Mortar to mortar and mortar to aggregate stiffness
-    sys.GetSettings()->dfc_contact_param.E_Na = 100e6;  /// Aggregate to aggregate stiffness
-    sys.GetSettings()->dfc_contact_param.h = 2.5e-3;    /// Thickness of mortar layer around an aggregate
-    sys.GetSettings()->dfc_contact_param.alfa_a = 0.25; /// Normal-shear coupling parameter inside concrete
-    sys.GetSettings()->dfc_contact_param.beta = 0.5;    /// Parameter governing viscous behaviour in normal direction
-    sys.GetSettings()->dfc_contact_param.sigma_t = 0.0025e6;    /// Tensile strength of mortar
-    sys.GetSettings()->dfc_contact_param.sigma_tau0 = 50;   /// Mortar shear yield stress
-    sys.GetSettings()->dfc_contact_param.eta_inf = 50;  /// Mortar plastic viscosity
-    sys.GetSettings()->dfc_contact_param.kappa_0 = 100; /// Peanalty constant
-    sys.GetSettings()->dfc_contact_param.n = 1;       /// Constant defining flow (n = 1 -> Newtonian, n > 1 -> shear-thickening,
-      /// n < 1 shear-thinning)
-    sys.GetSettings()->dfc_contact_param.mi_a = 0.5;    /// Aggregate to aggregate friction coefficient
-    sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.05e6;   /// Mortar to surface stiffness
-    sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;    /// Mortar to aggregate stiffness
-    sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;   /// Normal-shear coupling parameter for concrete interaction with surface
+    sys.GetSettings()->dfc_contact_param.E_Nm = 0.04e6;  /// Mortar to mortar and mortar to aggregate stiffness
+    sys.GetSettings()->dfc_contact_param.E_Na = 100e6;   /// Aggregate to aggregate stiffness
+    sys.GetSettings()->dfc_contact_param.h = 3e-3;       /// Thickness of mortar layer around an aggregate
+    sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;  /// Normal-shear coupling parameter inside concrete
+    sys.GetSettings()->dfc_contact_param.beta = 0.5;     /// Parameter governing viscous behaviour in normal direction
+    sys.GetSettings()->dfc_contact_param.sigma_t = 0.009e6;  /// Tensile strength of mortar
+    sys.GetSettings()->dfc_contact_param.sigma_tau0 = 250;   /// Mortar shear yield stress
+    sys.GetSettings()->dfc_contact_param.eta_inf = 10;       /// Mortar plastic viscosity
+    sys.GetSettings()->dfc_contact_param.kappa_0 = 100;      /// Peanalty constant
+    sys.GetSettings()->dfc_contact_param.n = 1;              /// Constant defining flow (n = 1 -> Newtonian, n > 1 ->
+                                                 /// shear-thickening, n < 1 shear-thinning)
+    sys.GetSettings()->dfc_contact_param.mi_a = 0.5;       /// Aggregate to aggregate friction coefficient
+    sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.04e6;  /// Mortar to surface stiffness
+    sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;   /// Mortar to aggregate stiffness
+    sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;  /// Normal-shear coupling parameter for concrete interaction with surface
     sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.0024e6;  /// Tensile strength of mortar interacting with surface
-    sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 50; /// Mortar shear yield stress interacting with surface
-    sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;    /// Mortar plastic viscosity interacting with surface
-    sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;  /// Aggregate to surface friction coefficient
-    sys.GetSettings()->dfc_contact_param.t = 2.5e-3;    /// thickness of mortar layer on surfaces
+    sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 250;    /// Mortar shear yield stress interacting with surface
+    sys.GetSettings()->dfc_contact_param.eta_inf_s = 10;        /// Mortar plastic viscosity interacting with surface
+    sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;          /// Aggregate to surface friction coefficient
+    sys.GetSettings()->dfc_contact_param.t = 2.5e-3;            /// thickness of mortar layer on surfaces
 
     // The following two lines are optional, since they are the default options. They are added for future reference,
     // i.e. when needed to change those models.
     sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
-  
-    int ball_quantity = 4;
-    auto created_balls = AddBalls(sys,ball_quantity , 0.1);
-    
-	std::shared_ptr<ChVisualSystem> vis;
-	auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
+
+    int ball_quantity = 2;
+    auto created_balls = AddBalls(sys, ball_quantity, -0.007);
+    created_balls[1]->SetBodyFixed(true);
+
+    std::shared_ptr<ChVisualSystem> vis;
+    auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
     vis_irr->AttachSystem(&sys);
     vis_irr->SetWindowSize(800, 600);
     vis_irr->SetWindowTitle("SMC callbacks");
@@ -237,9 +242,6 @@ int main(int argc, char* argv[]) {
                           << "Contact deformation [m]"
                           << "\n";
     }
-	// a file to store evolution of strain data during collision
-    std::ofstream strain_data;
-    strain_data.open("all_strain_data.txt");
 
     double simulation_time = 0;
     while (simulation_time <= 1) {
@@ -250,11 +252,78 @@ int main(int argc, char* argv[]) {
         sys.DoStepDynamics(time_step);
         vis->EndScene();
         simulation_time += time_step;
+        /*
+        auto rot_pos_as_quaternion = chrono::ChQuaternion();
+        created_balls[0]->SetPos(chrono::ChVector<>(0, 0, 0));  // keep the velocity as constant
+        created_balls[0]->SetPos_dt(chrono::ChVector<>(0, 0, 0));
+        rot_pos_as_quaternion.Q_from_AngAxis(70 * simulation_time, chrono::ChVector<>(0, 0, -1));
+        created_balls[0]->SetRot(rot_pos_as_quaternion);
+        created_balls[0]->SetWvel_par(chrono::ChVector<>(0, 0, 70));
+        */
+        
+        if (simulation_time <= 0.5) {
+            created_balls[0]->SetPos(chrono::ChVector<>(-0.007 * simulation_time, 0, 0));  // keep the velocity as constant
+            created_balls[0]->SetPos_dt(chrono::ChVector<>(-0.007, 0, 0)); 
+            created_balls[0]->SetRot(QUNIT);
+            created_balls[0]->SetRot_dt(QUNIT);
+        }
+        
+        if (simulation_time > 0.5  && simulation_time <= 1) {
+            created_balls[0]->SetPos(chrono::ChVector<>(-0.007 * 0.5, -0.007 * (simulation_time - 0.5),0));  // keep the velocity as constant 
+            created_balls[0]->SetPos_dt(chrono::ChVector<>(0, -0.007, 0));
+            created_balls[0]->SetRot(QUNIT);
+            created_balls[0]->SetRot_dt(QUNIT);
+        }
+        /*
+        if (simulation_time > 1) {
+            created_balls[0]->SetPos(chrono::ChVector<>(-0.008 * 0.5 + 0.014 * (0.5) - 0.014 * (simulation_time - 1), 0,
+        0));  // keep the velocity as constant created_balls[0]->SetPos_dt(chrono::ChVector<>(-0.014, 0, 0));
+            created_balls[0]->SetRot(QUNIT);
+            created_balls[0]->SetRot_dt(QUNIT);
+        }
+        */
+        /* 
+       auto rot_pos_as_quaternion = chrono::ChQuaternion();
+       if (simulation_time > 0.5 && simulation_time <= 1) {
+            created_balls[0]->SetPos(chrono::ChVector<>(-0.003, 0, 0));  // keep the velocity as constant
+            created_balls[0]->SetPos_dt(chrono::ChVector<>(0, 0, 0));
+            rot_pos_as_quaternion.Q_from_AngAxis((CH_C_PI/6) * (simulation_time-0.5), chrono::ChVector<>(0, 1, 0));
+            created_balls[0]->SetRot(rot_pos_as_quaternion);
+            created_balls[0]->SetWvel_par(chrono::ChVector<>(0, CH_C_PI/6 , 0));
+       }
+       if (simulation_time > 1  && simulation_time <= 1.5) {
+           created_balls[0]->SetPos(chrono::ChVector<>(-0.003, 0, 0));  // keep the velocity as constant
+           created_balls[0]->SetPos_dt(chrono::ChVector<>(0, 0, 0));
+           rot_pos_as_quaternion.Q_from_AngAxis((CH_C_PI/6)*0.5 - (CH_C_PI/6) * (simulation_time - 1), chrono::ChVector<>(0, 1, 0));
+           created_balls[0]->SetRot(rot_pos_as_quaternion);
+           created_balls[0]->SetWvel_par(chrono::ChVector<>(0, -CH_C_PI/6, 0));
+       }
+       if (simulation_time > 1.5) {
+           created_balls[0]->SetPos(chrono::ChVector<>(-0.003, 0, 0));  // keep the velocity as constant
+           created_balls[0]->SetPos_dt(chrono::ChVector<>(0, 0, 0));
+           rot_pos_as_quaternion.Q_from_AngAxis((CH_C_PI / 6) * (simulation_time - 1.5), chrono::ChVector<>(0, 1, 0));
+           created_balls[0]->SetRot(rot_pos_as_quaternion);
+           created_balls[0]->SetWvel_par(chrono::ChVector<>(0, CH_C_PI/6, 0));
+       }
+       */ 
+       
         std::shared_ptr<MyContactReport> PointerToContactDataStoringClass = std::make_shared<MyContactReport>();
         sys.GetContactContainer()->ReportAllContacts(PointerToContactDataStoringClass);
         for (int k = 0; k < ball_quantity; k++) {
-            data_files[k] << simulation_time << ", " << created_balls[k]->GetPos()[0] << ", "
-                          << created_balls[k]->GetPos_dt()[0] << ", " << created_balls[k]->GetPos_dtdt()[0] << ", ";
+            data_files[k] << simulation_time << ", ";
+            for (int j = 0; j < 3; j++) {
+                data_files[k] << created_balls[k]->GetPos()[j] << ", ";
+            }
+            data_files[k] << created_balls[k]->GetRotAngle() << ", ";
+            for (int j = 0; j < 3; j++) {
+                data_files[k] << created_balls[k]->GetRotAxis()[j] << ", ";
+            }
+            for (int j = 0; j < 3; j++) {
+                data_files[k] << created_balls[k]->GetPos_dt()[j] << ", ";
+            }
+            for (int j = 0; j < 3; j++) {
+                data_files[k] << created_balls[k]->GetWvel_par()[j] << ", ";
+            }
             //<< created_balls[k]->GetContactForce()[0] << ", ";
             if (!PointerToContactDataStoringClass->VectorOfCollisionData.empty()) {
                 bool added_contact_force = false;
@@ -269,13 +338,14 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 if (!added_contact_force) {
-                    data_files[k] << "0, " << "0\n";
+                    data_files[k] << "0, "
+                                  << "0\n";
                 }
             } else {
-                data_files[k] << "0, " << "0\n";
+                data_files[k] << "0, "
+                              << "0\n";
             }
         }
     }
-    strain_data.close();
     return 0;
- }
+}
