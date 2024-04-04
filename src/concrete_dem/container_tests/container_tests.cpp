@@ -66,7 +66,7 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
   material->SetFriction(0.2);
   double radius = 0;  0.5 * d_param.GetRandom();
   double box_size = d_param.GetMaxSize() + 0.001;  // max aggregate size + 1 mm for safety
-  double density = 797 / (1 + 0.4 + 2.25);
+  double density = 797 * (1 + 0.4 + 2.25);
   double h = d_param.GetHLayer();
   double mass = 0;
   float shift_x[4] = {box_size/2, 0, -box_size/2, 0};
@@ -83,7 +83,7 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
       for (int i = 0; i < box_number; ++i) {
 	auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
 	radius = 0.5 * d_param.GetRandom();
-	double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;
+	double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * density;
 	ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
 	ball->SetMass(mass);
 	ball->SetPos(ChVector<>(i * box_size +  0.5 * box_size - 0.5 * box_size * box_number
@@ -123,8 +123,8 @@ std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVect
   material->SetFriction(0.2);
   double radius = 0.008;   // in meters, I have doubt about used units
   double h = 4e-3;
-  double density = 797 / (1 + 0.4 + 2.25);
-  double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;
+  double density = 797 * (1 + 0.4 + 2.25);
+  double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * density;
   auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
   ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
   ball->SetMass(mass);
@@ -347,8 +347,8 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
   std::vector<std::shared_ptr<ChBody>> container_walls = create_container(&sys, 0.15);
   
-  AddSphereLayers(20, 12, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
-  
+  //AddSphereLayers(20, 12, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  read_particles_VTK(sys, "OUT_VTK/particle_time_steps_00100.vtk");
   double simulation_time = 0;
   double time_step = 1e-06;
   // time interval for data storage expressed in simulation steps
@@ -384,7 +384,7 @@ int main(int argc, char* argv[]) {
 	continue_simulation = false;
 	GetLog() << "Simulation stopped. No particles in container.";
       }
-      if (simulation_time > 1)
+      if (simulation_time > 0.001)
 	continue_simulation = false;
     }
     ++step_num;
