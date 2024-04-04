@@ -388,6 +388,7 @@ mark_as_advanced(FORCE
     CUDA_rt_LIBRARY)
 
 # Identify the CUDA architecture
+set(CH_CXX17 FALSE)
 if(CUDA_FOUND)
 
   mark_as_advanced(FORCE CUDA_USE_STATIC_CUDA_RUNTIME)
@@ -420,6 +421,7 @@ if(CUDA_FOUND)
   message(STATUS "  CUDA compile flags:   ${CUDA_NVCC_FLAGS}")
 
 endif()
+set(CH_CXX17 TRUE)
 
 #-----------------------------------------------------------------------------
 # Thrust library

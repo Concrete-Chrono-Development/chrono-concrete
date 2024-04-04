@@ -224,7 +224,8 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
             message(FATAL_ERROR "Using GCC version ${CMAKE_CXX_COMPILER_VERSION}. GCC <= 4.9 is not supported! Please use a newer compiler")
         endif()
     endif()
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --compiler-options -fPIC --compiler-options -Wall -lineinfo)
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; --compiler-options -fPIC --compiler-options -Wall -lineinfo")
+#-std c++14 -Xcompiler -std=c++17; --compiler-options; -fPIC; gencode; arch=compute_61,code=sm_61
 
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
