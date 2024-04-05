@@ -319,6 +319,59 @@ void print_energy_status(ChSystemMulticore& sys){
   GetLog() << " Total rotational kinetic energy: " << total_rot_kin_e << "\n";
 }
 
+// function adding cover and 0.1 kPa pressure for formwork pressure
+std::shared_ptr<ChBody> add_cover_formwork_pressure(ChSystemMulticore& sys, double container_size) {
+  // create ChBody for cover
+  double thickness = 0.01;  // wall thickness (same as for container walls)
+  double density = 10; // it may impact the concrete load due to gravity, keep it low for now 
+  auto mat = chrono_types::make_shared<chrono::ChMaterialSurfaceSMC>();
+  mat->SetYoungModulus(2.05e11);  // material parameters are not relevant, overloaded by DFC model
+  mat->SetPoissonRatio(0.3);
+  mat->SetRestitution(0.5);
+  mat->SetFriction(0.2);
+ 
+  auto cover = std::shared_ptr<ChBody>(sys.NewBody());
+  cover->SetMass(1);  // gravity load will be compensated with applied force 
+  cover->SetIdentifier(-6);
+  cover->SetInertiaXX(ChVector<>(0.01, 0.01, 0.01));
+  cover->SetPos(ChVector<>(0, 0, container_size + thickness/2));
+  cover->SetBodyFixed(false);
+  cover->SetCollide(true);
+  cover->GetCollisionModel()->ClearModel();
+  utils::AddBoxGeometry(cover.get(), mat,
+			ChVector<>(container_size, container_size, thickness));
+  cover->GetCollisionModel()->BuildModel();
+  sys.AddBody(cover);
+
+  // Create basement (copied from Bahar code, not sure if it is necessary, may use bottom plate)    
+  auto mtruss = chrono_types::make_shared<ChBody>();
+  mtruss->SetBodyFixed(true);
+  sys.AddBody(mtruss);
+  
+  // constrain the cover (only movement in z axis is allowed)
+  auto constr_cover = chrono_types::make_shared<ChLinkMateGeneric>(true, true, false,
+								   true, true, true);
+  constr_cover->Initialize(cover, mtruss, false, cover->GetFrame_REF_to_abs(),
+			   mtruss->GetFrame_REF_to_abs());
+  sys.Add(constr_cover);
+
+  // add force to compensate weight of cover
+  auto load_container = chrono_types::make_shared<ChLoadContainer>();
+  auto weight_compensation = chrono_types::make_shared<ChLoadBodyForce>(cover, ChVector<>(0, 0, 9.81),
+									false, ChVector<>(0, 0, 0));
+  load_container->Add(weight_compensation);
+  sys.Add(load_container);
+
+  // create pressure load
+  double pressure = 0.1 * 1000;  // 0.1 kPa expressed in Pa
+  auto motorZ = chrono_types::make_shared<ChLinkMotorLinearForce>();
+  motorZ->Initialize(cover, mtruss, cover->GetFrame_REF_to_abs());
+  auto loadZ = chrono_types::make_shared<ChFunction_Const>(-pressure * 0.15 * 0.15);
+  motorZ->SetForceFunction(loadZ);
+  sys.Add(motorZ);
+  return cover;
+}
+
 int main(int argc, char* argv[]) {
   GetLog() << "Test application for implementation of DFC model in chrono::multicore\n";
   GetLog() << "Based on open source library projectchrono.org Chrono version: "
