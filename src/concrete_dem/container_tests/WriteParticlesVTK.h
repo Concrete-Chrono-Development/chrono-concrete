@@ -240,7 +240,8 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
   for (int i = 0; i < particle_number; ++i) {
     auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
     double mass = ((4.0 / 3.0) * 3.1415 * pow(particle_radiuses[i], 3)) * density;
-    ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * chrono::ChVector<>(1, 1, 1));
+    ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
+		       chrono::ChVector<>(1, 1, 1));
     ball->SetMass(mass);
     ball->SetPos(particle_pos[i]);
     ball->SetPos_dt(particle_l_velocity[i]);
@@ -253,5 +254,127 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
     sys.AddBody(ball);
   }
 
+}
+
+void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& filename, double limit) {
+  // restore system state saved in VTK file
+  // open the file
+  std::ifstream vtk_file(filename);
+  if (!vtk_file.is_open()) {
+    std::cerr << "Error: unable to open file " << filename << "\n";
+  }
+
+  // read number of particles
+  int particle_number = 0;
+  std::string line;
+  while (std::getline(vtk_file, line)) {
+    if (line.find("POINTS") != std::string::npos) {
+      std::istringstream iss(line);
+      std::string temp;
+      while (!iss.eof()) {
+	iss >> temp;  // read one word and move to next one
+	if (std::stringstream(temp) >> particle_number)  // is true if temp is an int number
+	  break;
+      }
+      break;
+    }
+  }
+
+  // read particle positions
+  std::vector<ChVector<>> particle_pos;
+  std::string temp;
+  float temp_number;
+  for (int i = 0; i < particle_number; ++i){
+    std::getline(vtk_file, line);
+    std::istringstream iss(line);
+    std::vector<float> coordinates;
+    while (!iss.eof()) {
+      iss >> temp;
+      std::stringstream(temp) >> temp_number;
+      coordinates.push_back(temp_number);
+    }
+    particle_pos.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+  }
+
+  // read particle radius
+  std::vector<float> particle_radiuses;
+  while (std::getline(vtk_file, line)) {
+    if (line.find("LOOKUP_TABLE") != std::string::npos) {
+      for (int i = 0; i < particle_number; ++i) {
+	std::getline(vtk_file, line);
+	std::istringstream iss(line);
+	float temp_radius;
+	iss >> temp_radius;
+	particle_radiuses.push_back(temp_radius);
+      }
+      break;
+    }
+  }
+
+  // read particle translation velocity
+  std::vector<ChVector<>> particle_l_velocity;
+  while (std::getline(vtk_file, line)) {
+    if (line.find("l_velocity") != std::string::npos) {
+      for (int i = 0; i < particle_number; ++i) {
+	std::getline(vtk_file, line);
+	std::istringstream iss(line);
+	std::vector<float> coordinates;
+	while (!iss.eof()) {
+	  iss >> temp;
+	  std::stringstream(temp) >> temp_number;
+	  coordinates.push_back(temp_number);
+	}
+	particle_l_velocity.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+      }
+      break;
+    }
+  }
+
+  // read particle angular velocity
+  std::vector<ChVector<>> particle_ang_velocity;
+  while (std::getline(vtk_file, line)) {
+    if (line.find("ang_velocity") != std::string::npos) {
+      for (int i = 0; i < particle_number; ++i) {
+	std::getline(vtk_file, line);
+	std::istringstream iss(line);
+	std::vector<float> coordinates;
+	while (!iss.eof()) {
+	  iss >> temp;
+	  std::stringstream(temp) >> temp_number;
+	  coordinates.push_back(temp_number);
+	}
+	particle_ang_velocity.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+      }
+      break;
+    }
+  }
+  vtk_file.close();
+
+  // create particles
+  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  material->SetYoungModulus(2.05e11);
+  material->SetPoissonRatio(0.3);
+  material->SetRestitution(0.5);
+  material->SetFriction(0.2);
+  double density = 797 * (1 + 0.4 + 2.25);
+  for (int i = 0; i < particle_number; ++i) {
+    if (particle_pos[i].z() > limit || particle_pos[i] < 0 || abs(particle_pos[i].x()) > limit/2 ||
+	abs(particle_pos[i].y()) > limit/2)
+      continue;
+    auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+    double mass = ((4.0 / 3.0) * 3.1415 * pow(particle_radiuses[i], 3)) * density;
+    ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
+		       chrono::ChVector<>(1, 1, 1));
+    ball->SetMass(mass);
+    ball->SetPos(particle_pos[i]);
+    ball->SetPos_dt(particle_l_velocity[i]);
+    ball->SetWvel_par(particle_ang_velocity[i]);
+    ball->GetCollisionModel()->ClearModel();
+    utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
+    ball->SetBodyFixed(false);
+    ball->SetCollide(true);
+    ball->GetCollisionModel()->BuildModel();
+    sys.AddBody(ball);
+  }
 }
 #endif

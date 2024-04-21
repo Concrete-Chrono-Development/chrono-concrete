@@ -32,6 +32,10 @@
 #include "chrono_thirdparty/rapidjson/prettywriter.h"
 #include "chrono_thirdparty/rapidjson/stringbuffer.h"
 #include "chrono_thirdparty/filesystem/path.h"
+#include "chrono/physics/ChLinkMate.h"
+#include "chrono/physics/ChLinkMotorLinearForce.h"
+#include "chrono/physics/ChLoadContainer.h"
+#include "chrono/physics/ChLoadsBody.h"
 
 using namespace chrono;
 //using namespace chrono::irrlicht;
@@ -49,20 +53,35 @@ double calc_aggVolFrac(std::vector<std::shared_ptr<ChBody>> &bodylist,
   return avfrac / specimenVol;
 }
 
-void delete_particle(ChSystemMulticoreSMC& sys, double limit_z) {
+void delete_particle(ChSystemMulticoreSMC& sys, double limit) {
   std::list<std::shared_ptr<ChBody>> to_delete;
   for (auto body : sys.Get_bodylist()) {
     if (body->GetCollisionModel()->GetShape(0)->GetType() != 0)
       continue;
     ChVector<> pos = body->GetPos();
-    if (pos.z() > limit_z)
+    if (pos.z() > limit || pos.z() < 0.0 || abs(pos.x()) > limit/2 || abs(pos.y()) > limit/2){
       to_delete.push_back(body);
+    }
   }
   std::list<std::shared_ptr<ChBody>>::iterator ibody = to_delete.begin();
   while (ibody != to_delete.end()){
     sys.Remove((*ibody));
     ++ibody;
   }
+}
+
+std::vector<std::shared_ptr<ChBody>> list_particle_for_removal(ChSystemMulticoreSMC& sys, 
+							      double limit) {
+  std::vector<std::shared_ptr<ChBody>> to_delete;
+  for (auto body : sys.Get_bodylist()) {
+    if (body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+      continue;
+    ChVector<> pos = body->GetPos();
+    if (pos.z() > limit || pos.z() < 0.0 || abs(pos.x()) > limit/2 || abs(pos.y()) > limit/2){
+      to_delete.push_back(body);
+    }
+  }
+  return to_delete;
 }
 
 // define a class for concrete particle distribution
@@ -282,6 +301,34 @@ void write_wall_forces(std::vector<std::shared_ptr<ChBody>> walls, std::string f
   file_to_write.close();
 }
 
+// function to write reaction forces acting on container walls
+void write_cover_data(std::shared_ptr<ChBody> cover, std::string file_name,
+		       double time){
+  std::ofstream file_to_write;
+  file_to_write.open(file_name, std::ios_base::app);
+  file_to_write << "Current time step for cover data: " << time << "\n";
+  ChVector<> temp_vector = cover->GetAppliedForce();
+  file_to_write << "Force applied to cover " << "x= " << temp_vector.x() << " y= " << temp_vector.y()
+		<< " z= " << temp_vector.z() << "\n";
+  temp_vector = cover->Get_accumulated_force();
+  file_to_write << "Accumulated force " << "x= " << temp_vector.x() << " y= " << temp_vector.y()
+		<< " z= " << temp_vector.z() << "\n";
+  temp_vector = cover->GetPos();
+  file_to_write << "Position of cover " << "x= " << temp_vector.x() << " y= " << temp_vector.y()
+		<< " z= " << temp_vector.z() << "\n";
+  temp_vector = cover->GetPos_dt();
+  file_to_write << "Velocity of cover " << "x= " << temp_vector.x() << " y= " << temp_vector.y()
+		<< " z= " << temp_vector.z() << "\n";
+  auto force_list = cover->GetForceList();
+  file_to_write << "Size of force list is: " << force_list.size() << "\n";
+  for (auto force : force_list){
+    file_to_write << force << "\n";
+  }
+  file_to_write << "\n";
+  file_to_write.close();
+}
+
+
 // function checking, if particles are inside the box
 bool any_particle_inside(ChSystemMulticore& sys){
   auto body_list = sys.Get_bodylist();
@@ -296,7 +343,7 @@ bool any_particle_inside(ChSystemMulticore& sys){
 }
 
 // function printing current energy status
-void print_energy_status(ChSystemMulticore& sys){
+ChVector<> print_energy_status(ChSystemMulticore& sys){
   float total_trans_kin_e = 0;
   float total_rot_kin_e = 0;
   auto body_list = sys.Get_bodylist();
@@ -317,6 +364,7 @@ void print_energy_status(ChSystemMulticore& sys){
   }
   GetLog() << "Total transnational kinetic energy: " << total_trans_kin_e;
   GetLog() << " Total rotational kinetic energy: " << total_rot_kin_e << "\n";
+  return ChVector<>(total_trans_kin_e, total_rot_kin_e, 0);
 }
 
 // function adding cover and 0.1 kPa pressure for formwork pressure
@@ -331,10 +379,10 @@ std::shared_ptr<ChBody> add_cover_formwork_pressure(ChSystemMulticore& sys, doub
   mat->SetFriction(0.2);
  
   auto cover = std::shared_ptr<ChBody>(sys.NewBody());
-  cover->SetMass(1);  // gravity load will be compensated with applied force 
+  cover->SetMass(2.25/9.81);  // use gravity load as pressure 
   cover->SetIdentifier(-6);
   cover->SetInertiaXX(ChVector<>(0.01, 0.01, 0.01));
-  cover->SetPos(ChVector<>(0, 0, container_size + thickness/2));
+  cover->SetPos(ChVector<>(0, 0, container_size + 0.6*thickness));
   cover->SetBodyFixed(false);
   cover->SetCollide(true);
   cover->GetCollisionModel()->ClearModel();
@@ -346,29 +394,33 @@ std::shared_ptr<ChBody> add_cover_formwork_pressure(ChSystemMulticore& sys, doub
   // Create basement (copied from Bahar code, not sure if it is necessary, may use bottom plate)    
   auto mtruss = chrono_types::make_shared<ChBody>();
   mtruss->SetBodyFixed(true);
+  mtruss->SetIdentifier(-7);
   sys.AddBody(mtruss);
   
   // constrain the cover (only movement in z axis is allowed)
-  auto constr_cover = chrono_types::make_shared<ChLinkMateGeneric>(true, true, false,
-								   true, true, true);
-  constr_cover->Initialize(cover, mtruss, false, cover->GetFrame_REF_to_abs(),
-			   mtruss->GetFrame_REF_to_abs());
-  sys.Add(constr_cover);
-
+  //  auto constr_cover = chrono_types::make_shared<ChLinkMateGeneric>(true, true, false,
+  //								   true, true, true);
+  //  constr_cover->Initialize(cover, mtruss, false, cover->GetFrame_REF_to_abs(),
+  //			   mtruss->GetFrame_REF_to_abs());
+  //  sys.Add(constr_cover);
+  double pressure = 0.1 * 1000;  // 0.1 kPa expressed in Pa
+  double pres_load = 0.15*0.15*pressure;
   // add force to compensate weight of cover
-  auto load_container = chrono_types::make_shared<ChLoadContainer>();
-  auto weight_compensation = chrono_types::make_shared<ChLoadBodyForce>(cover, ChVector<>(0, 0, 9.81),
-									false, ChVector<>(0, 0, 0));
-  load_container->Add(weight_compensation);
-  sys.Add(load_container);
+  //  auto load_container = chrono_types::make_shared<ChLoadContainer>();
+  //  auto weight_compensation = chrono_types::make_shared<ChLoadBodyForce>(cover, ChVector<>(0, 0, 9.81),
+  //									false, ChVector<>(0, 0, 0));
+  //  auto pressure_load = chrono_types::make_shared<ChLoadBodyForce>(cover, ChVector<>(0, 0, -pres_load),
+  //									false, ChVector<>(0, 0, 0));
+  //  load_container->Add(weight_compensation);
+  //  load_container->Add(pressure_load);
+  //  sys.Add(load_container);
 
   // create pressure load
-  double pressure = 0.1 * 1000;  // 0.1 kPa expressed in Pa
-  auto motorZ = chrono_types::make_shared<ChLinkMotorLinearForce>();
-  motorZ->Initialize(cover, mtruss, cover->GetFrame_REF_to_abs());
-  auto loadZ = chrono_types::make_shared<ChFunction_Const>(-pressure * 0.15 * 0.15);
-  motorZ->SetForceFunction(loadZ);
-  sys.Add(motorZ);
+  //  auto motorZ = chrono_types::make_shared<ChLinkMotorLinearForce>();
+  //  motorZ->Initialize(cover, mtruss, cover->GetFrame_REF_to_abs());
+  //  auto loadZ = chrono_types::make_shared<ChFunction_Const>(-pressure * 0.15 * 0.15);
+  //  motorZ->SetForceFunction(loadZ);
+  //  sys.Add(motorZ);
   return cover;
 }
 
@@ -377,6 +429,17 @@ int main(int argc, char* argv[]) {
   GetLog() << "Based on open source library projectchrono.org Chrono version: "
 	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
+  std::string out_dir = "OUT_VTK_FP_Set_3";
+  if (!filesystem::create_directory(filesystem::path(out_dir))) {
+    std::cerr << "Error creating directory" << out_dir << std::endl;
+    return 1;
+  }
+  std::string terminal_log_file = out_dir + "/FP_Set_3_terminal_log.txt";
+  std::ofstream terminal_file(terminal_log_file);
+  terminal_file << "Test application for implementation of DFC model in chrono::multicore\n";
+  terminal_file << "Based on open source library projectchrono.org Chrono version: "
+	   << CHRONO_VERSION << "\n";
+
   ChSystemMulticoreSMC sys;
   //sys.SetCollisionSystemType(collision_type);
   sys.Set_G_acc(ChVector<>(0, 0, -9.81));
@@ -400,7 +463,7 @@ int main(int argc, char* argv[]) {
   double rho_0 = cement * (1 + WtoC + AtoC);  // mixture density
   double targetmass = Va0 * rho_0;
   double targetVol = containerVol * 2.5;
-  sys.GetSettings()->dfc_contact_param.E_Nm = 0.04e6;  // 2nd param --> 0.25 / 0.50 / 1 / 2 / 4 
+  sys.GetSettings()->dfc_contact_param.E_Nm = 2*0.04e6;  // 2nd param --> 0.25 / 0.50 / 1 / 2 / 4 
   sys.GetSettings()->dfc_contact_param.E_Na = 100e6;
   sys.GetSettings()->dfc_contact_param.h = h_layer; // 1st param --> 0.75 / 1 / 1.10 / 1.20 / 1.40 
   sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;
@@ -411,7 +474,7 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.kappa_0 = 100;
   sys.GetSettings()->dfc_contact_param.n = 1;
   sys.GetSettings()->dfc_contact_param.mi_a = 0.5;
-  sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.04e6;
+  sys.GetSettings()->dfc_contact_param.E_Nm_s = 2*0.04e6;
   sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;
   sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;
   sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.005e6;
@@ -428,8 +491,9 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
   std::vector<std::shared_ptr<ChBody>> container_walls = create_container(&sys, 0.15);
   
-  //AddSphereLayers(20, 12, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
-  read_particles_VTK(sys, "OUT_VTK/particle_time_steps_00100.vtk");
+  //AddSphereLayers(35, 13, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  //  read_particles_VTK(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk");
+  read_particles_VTK_inside(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk", 0.15);
 
   double simulation_time = 0;
   double time_step = 1e-06;
@@ -441,41 +505,68 @@ int main(int argc, char* argv[]) {
   int step_num = 0;
   bool continue_simulation = true;
 
-  std::string out_dir = "OUT_VTK";
-  if (!filesystem::create_directory(filesystem::path(out_dir))) {
-    std::cerr << "Error creating directory" << out_dir << std::endl;
-    return 1;
-  }
   std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
+  std::shared_ptr<ChBody> cover;
+  //cover = add_cover_formwork_pressure(sys, 0.15);
+  //GetLog() << "Out of delete_particle function \n";
+  std::vector<std::shared_ptr<ChBody>> list_of_particles_to_delete;
+  list_of_particles_to_delete = list_particle_for_removal(sys, 0.15);
+
+  //  for (auto i : list_of_particles_to_delete){
+  //GetLog() << "Before step dynamics" << "\n";
+  //sys.DoStepDynamics(time_step);  // init system for correct delete
+  //GetLog() << "Before energy calculation" << "\n";
+  //ChVector<> temp_energy(print_energy_status(sys));
+  //terminal_file << "Total transnational kinetic energy: " << temp_energy.x();
+  //terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";
+  //GetLog() << "Particle for removal: " << i->GetId() << "\n"; 
+  //sys.Remove(i);
+  //sys.Update();
+  //GetLog() << "Iteratively deleted particle: " << i->GetId() << "\n";
+  // }
   
   while (continue_simulation) {
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
+    if (simulation_time > 0.002 && !switch_val){
+      cover = add_cover_formwork_pressure(sys, 0.15);
+      switch_val = true;
+    }
+    if (cover)
+	  write_cover_data(cover, reaction_forces_file, simulation_time);
     if (register_data) {
       if (std::fmod(step_num, save_step) == 0) {
 	std::string file_name = out_dir + generate_file_name("/particle_time_steps", saved_steps);
 	write_particles_VTK(sys, file_name);
 	++saved_steps;
 	write_wall_forces(container_walls, reaction_forces_file, simulation_time);
+	//	if (cover)
+	//	  write_cover_data(cover, reaction_forces_file, simulation_time);
 	GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
+	terminal_file << "Simulation is running. Current time step: " << simulation_time << "\n";
       }
     }
     if (std::fmod(step_num, 1000) == 0){
-      print_energy_status(sys);
+      ChVector<> temp_energy(print_energy_status(sys));
+      terminal_file << "Total transnational kinetic energy: " << temp_energy.x();
+      terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";      
       if (!any_particle_inside(sys)){
 	continue_simulation = false;
 	GetLog() << "Simulation stopped. No particles in container.";
+	terminal_file << "Simulation stopped. No particles in container.";
       }
-      if (simulation_time > 1.5)
+      if (simulation_time > 0.3)
 	continue_simulation = false;
     }
     ++step_num;
   }
 
-  delete_particle(sys, 0.15);
   std::vector<std::shared_ptr<ChBody>> body_list = sys.Get_bodylist();
   double aggVolFrac = calc_aggVolFrac(body_list, h_layer, containerVol);
   GetLog() << "Aggregate volume fraction is equal: " << aggVolFrac << "\n";
-
+  terminal_file << "Aggregate volume fraction is equal: " << aggVolFrac << "\n";
+  terminal_file.close();
   return 0;
 }
+
+
