@@ -251,6 +251,17 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
     ball->SetBodyFixed(false);
     ball->SetCollide(true);
     ball->GetCollisionModel()->BuildModel();
+#ifdef IRR
+    auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
+    sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
+    sphere1->SetOpacity(0.4f);
+    auto sphere2 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i] - 4e-3);
+    sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
+    auto ball_vis = chrono_types::make_shared<ChVisualModel>();
+    ball_vis->AddShape(sphere1);
+    ball_vis->AddShape(sphere2);
+    ball->AddVisualModel(ball_vis);
+#endif
     sys.AddBody(ball);
   }
 
@@ -372,8 +383,22 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
     ball->GetCollisionModel()->ClearModel();
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
     ball->SetBodyFixed(false);
+    ball->SetLimitSpeed(true);
+    ball->SetMaxSpeed(.2);
+    ball->SetMaxWvel(.2);
     ball->SetCollide(true);
     ball->GetCollisionModel()->BuildModel();
+#ifdef IRR
+    auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
+    sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
+    sphere1->SetOpacity(0.4f);
+    auto sphere2 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i] - 4e-3);
+    sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
+    auto ball_vis = chrono_types::make_shared<ChVisualModel>();
+    ball_vis->AddShape(sphere1);
+    ball_vis->AddShape(sphere2);
+    ball->AddVisualModel(ball_vis);
+#endif
     sys.AddBody(ball);
   }
 }

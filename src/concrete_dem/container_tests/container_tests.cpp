@@ -16,19 +16,19 @@
 //  Implemented tests include three tests done in container: gravity-driven tests (1 and 2)
 //  and hydrostatic confinement test.
 
+// comment the line below two switch off irrlicht visualisation
+#define IRR
+
 #include <vector>
 #include "chrono_multicore/physics/ChSystemMulticore.h"
 #include "chrono/collision/ChCollisionSystemBullet.h"
-//#include "chrono_irrlicht/ChVisualSystemIrrlicht.h"
 #include "chrono/assets/ChVisualSystem.h"
 #include "chrono/utils/ChUtilsCreators.h"
 #include "chrono/particlefactory/ChParticleRemover.h"
 #include "chrono/particlefactory/ChParticleEmitter.h"
 #include "chrono/core/ChDistribution.h"
-//#include "ParticleEmitterMulticore.h"
 #include "MyContactReport.h"
 #include "chrono/core/ChMathematics.h"
-#include "WriteParticlesVTK.h"
 #include "chrono_thirdparty/rapidjson/prettywriter.h"
 #include "chrono_thirdparty/rapidjson/stringbuffer.h"
 #include "chrono_thirdparty/filesystem/path.h"
@@ -38,8 +38,13 @@
 #include "chrono/physics/ChLoadsBody.h"
 
 using namespace chrono;
-//using namespace chrono::irrlicht;
 using namespace chrono::particlefactory;
+
+#ifdef IRR
+#include "chrono_irrlicht/ChVisualSystemIrrlicht.h"
+using namespace chrono::irrlicht;
+#endif
+#include "WriteParticlesVTK.h"
 
 double calc_aggVolFrac(std::vector<std::shared_ptr<ChBody>> &bodylist,
 		       double hlayer, double specimenVol){
@@ -139,22 +144,23 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
 				+ shift_y[l],
 				start_height + k * box_size));
 	ball->SetPos_dt(ChVector<>(0, 0, 0));
-	//ball->SetWvel_par(ChVector<>(0, 0, 0));
+	ball->SetWvel_par(ChVector<>(0, 0, 0));
 	ball->GetCollisionModel()->ClearModel();
 	utils::AddSphereGeometry(ball.get(), material, radius);
 	ball->SetBodyFixed(false);
 	ball->SetCollide(true);
 	ball->GetCollisionModel()->BuildModel();
-	//ball->SetNoGyroTorque(true);
-	//auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
-	//sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
-	//sphere1->SetOpacity(0.4f);
-	//auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
-	//sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
-	//auto ball_vis = chrono_types::make_shared<ChVisualModel>();
-	//ball_vis->AddShape(sphere1);
-	//ball_vis->AddShape(sphere2);
-	//ball->AddVisualModel(ball_vis);
+	#ifdef IRR
+	auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
+	sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
+	sphere1->SetOpacity(0.4f);
+	auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
+	sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
+	auto ball_vis = chrono_types::make_shared<ChVisualModel>();
+	ball_vis->AddShape(sphere1);
+	ball_vis->AddShape(sphere2);
+	ball->AddVisualModel(ball_vis);
+	#endif
 	sys.AddBody(ball);
       }
     }
@@ -178,21 +184,23 @@ std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVect
   ball->SetIdentifier(id);
   ball->SetPos(pos);
   ball->SetPos_dt(vel);
-  //ball->SetWvel_par(ChVector<>(0, 0, 0));
+  ball->SetWvel_par(ChVector<>(0, 0, 0));
   ball->GetCollisionModel()->ClearModel();
   utils::AddSphereGeometry(ball.get(), material, radius);
   ball->SetBodyFixed(false);
   ball->SetCollide(true);
   ball->GetCollisionModel()->BuildModel();
-  // auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
-  //  sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
-  //  sphere1->SetOpacity(0.4f);
-  //  auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
-  //  sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
-  //  auto ball_vis = chrono_types::make_shared<ChVisualModel>();
-  //  ball_vis->AddShape(sphere1);
-  //  ball_vis->AddShape(sphere2);
-  //  ball->AddVisualModel(ball_vis);
+  #ifdef IRR
+  auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
+  sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
+  sphere1->SetOpacity(0.4f);
+  auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
+  sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
+  auto ball_vis = chrono_types::make_shared<ChVisualModel>();
+  ball_vis->AddShape(sphere1);
+  ball_vis->AddShape(sphere2);
+  ball->AddVisualModel(ball_vis);
+  #endif
   sys.AddBody(ball);
   return ball;
 }
@@ -382,7 +390,7 @@ std::shared_ptr<ChBody> add_cover_formwork_pressure(ChSystemMulticore& sys, doub
   cover->SetMass(2.25/9.81);  // use gravity load as pressure 
   cover->SetIdentifier(-6);
   cover->SetInertiaXX(ChVector<>(0.01, 0.01, 0.01));
-  cover->SetPos(ChVector<>(0, 0, container_size + 0.6*thickness));
+  cover->SetPos(ChVector<>(0, 0, container_size + 1.32*thickness));
   cover->SetBodyFixed(false);
   cover->SetCollide(true);
   cover->GetCollisionModel()->ClearModel();
@@ -398,11 +406,11 @@ std::shared_ptr<ChBody> add_cover_formwork_pressure(ChSystemMulticore& sys, doub
   sys.AddBody(mtruss);
   
   // constrain the cover (only movement in z axis is allowed)
-  //  auto constr_cover = chrono_types::make_shared<ChLinkMateGeneric>(true, true, false,
-  //								   true, true, true);
-  //  constr_cover->Initialize(cover, mtruss, false, cover->GetFrame_REF_to_abs(),
-  //			   mtruss->GetFrame_REF_to_abs());
-  //  sys.Add(constr_cover);
+  auto constr_cover = chrono_types::make_shared<ChLinkMateGeneric>(true, true, false,
+  								   true, true, true);
+  constr_cover->Initialize(cover, mtruss, false, cover->GetFrame_REF_to_abs(),
+  			   mtruss->GetFrame_REF_to_abs());
+  sys.Add(constr_cover);
   double pressure = 0.1 * 1000;  // 0.1 kPa expressed in Pa
   double pres_load = 0.15*0.15*pressure;
   // add force to compensate weight of cover
@@ -507,10 +515,9 @@ int main(int argc, char* argv[]) {
 
   std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
   std::shared_ptr<ChBody> cover;
-  //cover = add_cover_formwork_pressure(sys, 0.15);
-  //GetLog() << "Out of delete_particle function \n";
-  std::vector<std::shared_ptr<ChBody>> list_of_particles_to_delete;
-  list_of_particles_to_delete = list_particle_for_removal(sys, 0.15);
+  cover = add_cover_formwork_pressure(sys, 0.15);
+  //std::vector<std::shared_ptr<ChBody>> list_of_particles_to_delete;
+  //list_of_particles_to_delete = list_particle_for_removal(sys, 0.15);
 
   //  for (auto i : list_of_particles_to_delete){
   //GetLog() << "Before step dynamics" << "\n";
@@ -524,14 +531,34 @@ int main(int argc, char* argv[]) {
   //sys.Update();
   //GetLog() << "Iteratively deleted particle: " << i->GetId() << "\n";
   // }
-  
-  while (continue_simulation) {
+  #ifdef IRR
+  std::shared_ptr<ChVisualSystem> vis;
+  auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
+  vis_irr->AttachSystem(&sys);
+  vis_irr->SetWindowSize(800, 600);
+  vis_irr->SetWindowTitle("SMC callbacks");
+  vis_irr->Initialize();
+  vis_irr->AddLogo();
+  vis_irr->AddSkyBox();
+  vis_irr->AddCamera(ChVector<>(0.5, 0.5, 1));
+  vis_irr->AddTypicalLights();
+  vis = vis_irr;
+  #endif
+#ifdef IRR
+  while (vis->Run()) {
+    vis->BeginScene();
+    vis->Render();
+    vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
+    vis->EndScene();
+#else
+    while (continue_simulation) {
+#endif
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
-    if (simulation_time > 0.002 && !switch_val){
-      cover = add_cover_formwork_pressure(sys, 0.15);
-      switch_val = true;
-    }
+    //if (simulation_time > 0.002 && !switch_val){
+    //  cover = add_cover_formwork_pressure(sys, 0.15);
+    //  switch_val = true;
+    //}
     if (cover)
 	  write_cover_data(cover, reaction_forces_file, simulation_time);
     if (register_data) {
@@ -556,7 +583,11 @@ int main(int argc, char* argv[]) {
 	terminal_file << "Simulation stopped. No particles in container.";
       }
       if (simulation_time > 0.3)
+#ifdef IRR
+	break;
+#else
 	continue_simulation = false;
+#endif
     }
     ++step_num;
   }
