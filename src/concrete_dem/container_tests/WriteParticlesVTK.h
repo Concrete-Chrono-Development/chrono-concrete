@@ -367,13 +367,24 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
   material->SetFriction(0.2);
-  double density = 797 * (1 + 0.4 + 2.25);
+
+  // calculate updated density
+  double density_old = 797 * (1 + 0.4 + 2.25);
+  double V_l = 0;  // volume of particles in container
+  for (int i =0; i < particle_number; ++i) {
+    V_l += 0.75 * 3.141592653589793238462 * pow(particle_radiuses[i], 3);
+  }
+  double density_new = (density_old * 0.15 * 0.15 * 0.15) / V_l;
+  GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
+  GetLog() << "Total volume of particles in container: " << V_l << "\n";
+  GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
+
   for (int i = 0; i < particle_number; ++i) {
     if (particle_pos[i].z() > limit || particle_pos[i] < 0 || abs(particle_pos[i].x()) > limit/2 ||
 	abs(particle_pos[i].y()) > limit/2)
       continue;
     auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
-    double mass = ((4.0 / 3.0) * 3.1415 * pow(particle_radiuses[i], 3)) * density;
+    double mass = ((4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3)) * density_new;
     ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
 		       chrono::ChVector<>(1, 1, 1));
     ball->SetMass(mass);

@@ -17,7 +17,7 @@
 //  and hydrostatic confinement test.
 
 // comment the line below two switch off irrlicht visualisation
-#define IRR
+//#define IRR
 
 #include <vector>
 #include "chrono_multicore/physics/ChSystemMulticore.h"
@@ -301,7 +301,7 @@ void write_wall_forces(std::vector<std::shared_ptr<ChBody>> walls, std::string f
   file_to_write.open(file_name, std::ios_base::app);
   file_to_write << "Current time step: " << time << "\n";
   for (int i = 0; i < 5; ++i) {
-    ChVector<> temp_force = walls[i]->GetAppliedForce();
+    ChVector<> temp_force = walls[i]->GetContactForce();
     file_to_write << wall_names[i] << "x: " << temp_force.x() << " y: " << temp_force.y()
 		  << " z: " << temp_force.z() << "\n";
   }
