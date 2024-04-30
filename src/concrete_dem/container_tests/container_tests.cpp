@@ -309,6 +309,46 @@ void write_wall_forces(std::vector<std::shared_ptr<ChBody>> walls, std::string f
   file_to_write.close();
 }
 
+// function to export all contact forces acting on given container wall
+void write_wall_contacts(ChSystemMulticore& sys, std::shared_ptr<ChBody> wall,
+			 std::string file_name, double time){
+  std::ofstream file_to_write;
+  file_to_write.open(file_name, std::ios_base::app);
+  file_to_write << "Current time step: " << time << "\n";
+  std::shared_ptr<MyContactReport> contact_data_ptr = std::make_shared<MyContactReport>();
+  sys.GetContactContainer()->ReportAllContacts(contact_data_ptr);
+  if (!contact_data_ptr->VectorOfCollisionData.empty()) {
+    for (auto e : contact_data_ptr->VectorOfCollisionData){
+      if (e.contactobjA == wall->GetCollisionModel()->GetContactable()) {
+	for (int j = 0; j < 3; j++) {
+	  file_to_write << e.pA[j] << ", ";
+	}
+	for (int j = 0; j < 3; j++) {
+	  file_to_write << e.react_forces[j] << ",";
+	}
+	file_to_write << e.distance << "\n";
+      }
+      if (e.contactobjB == wall->GetCollisionModel()->GetContactable()) {
+	for (int j = 0; j < 3; j++) {
+	  file_to_write << e.pB[j] << ", ";
+	}
+	for (int j = 0; j < 3; j++) {
+	  file_to_write << e.react_forces[j] << ",";
+	}
+	file_to_write << e.distance << "\n";
+      }
+    }
+  }
+  else {
+    file_to_write << "No contacts to report. Empty vector with contacts.\n";
+    file_to_write.close();
+    return;
+  }
+  file_to_write << "\n";
+  file_to_write.close();
+  return;
+}
+
 // function to write reaction forces acting on container walls
 void write_cover_data(std::shared_ptr<ChBody> cover, std::string file_name,
 		       double time){
@@ -514,6 +554,7 @@ int main(int argc, char* argv[]) {
   bool continue_simulation = true;
 
   std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
+  std::string contact_forces_file = out_dir + "/wall_contact_forces.txt";
   std::shared_ptr<ChBody> cover;
   cover = add_cover_formwork_pressure(sys, 0.15);
   //std::vector<std::shared_ptr<ChBody>> list_of_particles_to_delete;
@@ -574,6 +615,7 @@ int main(int argc, char* argv[]) {
       }
     }
     if (std::fmod(step_num, 1000) == 0){
+      write_wall_contacts(sys, container_walls[1], contact_forces_file, simulation_time);
       ChVector<> temp_energy(print_energy_status(sys));
       terminal_file << "Total transnational kinetic energy: " << temp_energy.x();
       terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";      
@@ -582,7 +624,7 @@ int main(int argc, char* argv[]) {
 	GetLog() << "Simulation stopped. No particles in container.";
 	terminal_file << "Simulation stopped. No particles in container.";
       }
-      if (simulation_time > 0.3)
+      if (simulation_time > 0.002)
 #ifdef IRR
 	break;
 #else
