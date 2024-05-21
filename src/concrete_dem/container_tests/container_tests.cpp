@@ -121,8 +121,9 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
   double density = 797 * (1 + 0.4 + 2.25);
   double h = d_param.GetHLayer();
   double mass = 0;
-  float shift_x[4] = {box_size/2, 0, -box_size/2, 0};
-  float shift_y[4] = {0, box_size/2, 0, -box_size/2};
+  double shift_x[4] = {box_size/2, 0, -box_size/2, 0};
+  double shift_y[4] = {0, box_size/2, 0, -box_size/2};
+  double total_mass = 0;
   int l = -1;
   for (int k = 0; k < layer_number; ++k) {
     if (l < 4){
@@ -136,6 +137,7 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
 	auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
 	radius = 0.5 * d_param.GetRandom();
 	double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * density;
+	total_mass += mass;
 	ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
 	ball->SetMass(mass);
 	ball->SetPos(ChVector<>(i * box_size +  0.5 * box_size - 0.5 * box_size * box_number
@@ -165,6 +167,7 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
       }
     }
   }
+  GetLog() << "Total particle mass generated: " << total_mass << "\n";
   return;
 }
 
@@ -477,12 +480,12 @@ int main(int argc, char* argv[]) {
   GetLog() << "Based on open source library projectchrono.org Chrono version: "
 	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
-  std::string out_dir = "OUT_VTK_FP_Set_3";
+  std::string out_dir = "OUT_VTK_DeCompres_Set_0_run_1";
   if (!filesystem::create_directory(filesystem::path(out_dir))) {
     std::cerr << "Error creating directory" << out_dir << std::endl;
     return 1;
   }
-  std::string terminal_log_file = out_dir + "/FP_Set_3_terminal_log.txt";
+  std::string terminal_log_file = out_dir + "/DeCompres_Set_0_terminal_log.txt";
   std::ofstream terminal_file(terminal_log_file);
   terminal_file << "Test application for implementation of DFC model in chrono::multicore\n";
   terminal_file << "Based on open source library projectchrono.org Chrono version: "
@@ -511,7 +514,7 @@ int main(int argc, char* argv[]) {
   double rho_0 = cement * (1 + WtoC + AtoC);  // mixture density
   double targetmass = Va0 * rho_0;
   double targetVol = containerVol * 2.5;
-  sys.GetSettings()->dfc_contact_param.E_Nm = 2*0.04e6;  // 2nd param --> 0.25 / 0.50 / 1 / 2 / 4 
+  sys.GetSettings()->dfc_contact_param.E_Nm = 0.04e6;  // 2nd param --> 0.25 / 0.50 / 1 / 2 / 4 
   sys.GetSettings()->dfc_contact_param.E_Na = 100e6;
   sys.GetSettings()->dfc_contact_param.h = h_layer; // 1st param --> 0.75 / 1 / 1.10 / 1.20 / 1.40 
   sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;
@@ -522,7 +525,7 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.kappa_0 = 100;
   sys.GetSettings()->dfc_contact_param.n = 1;
   sys.GetSettings()->dfc_contact_param.mi_a = 0.5;
-  sys.GetSettings()->dfc_contact_param.E_Nm_s = 2*0.04e6;
+  sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.04e6;
   sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;
   sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;
   sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.005e6;
@@ -538,10 +541,14 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->collision.narrowphase_algorithm = collision::ChNarrowphase::Algorithm::HYBRID;
   sys.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
   std::vector<std::shared_ptr<ChBody>> container_walls = create_container(&sys, 0.15);
-  
-  //AddSphereLayers(35, 13, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+
+  std::shared_ptr<ChBody> cover;
+  //cover = add_cover_formwork_pressure(sys, 0.15);
+
+  // AddSphereLayers(36, 11, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  //AddSphereLayers(4, 15, 0.405, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
   //  read_particles_VTK(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk");
-  read_particles_VTK_inside(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk", 0.15);
+  read_particles_VTK_inside(sys, "OUT_VTK_DeCompres_Set_0_run_0/particle_time_steps_00500.vtk", 0.15);
 
   double simulation_time = 0;
   double time_step = 1e-06;
@@ -555,8 +562,7 @@ int main(int argc, char* argv[]) {
 
   std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
   std::string contact_forces_file = out_dir + "/wall_contact_forces.txt";
-  std::shared_ptr<ChBody> cover;
-  cover = add_cover_formwork_pressure(sys, 0.15);
+  
   //std::vector<std::shared_ptr<ChBody>> list_of_particles_to_delete;
   //list_of_particles_to_delete = list_particle_for_removal(sys, 0.15);
 
@@ -600,16 +606,16 @@ int main(int argc, char* argv[]) {
     //  cover = add_cover_formwork_pressure(sys, 0.15);
     //  switch_val = true;
     //}
-    if (cover)
-	  write_cover_data(cover, reaction_forces_file, simulation_time);
+    // if (cover)
+    //	  write_cover_data(cover, reaction_forces_file, simulation_time);
     if (register_data) {
       if (std::fmod(step_num, save_step) == 0) {
 	std::string file_name = out_dir + generate_file_name("/particle_time_steps", saved_steps);
 	write_particles_VTK(sys, file_name);
 	++saved_steps;
 	write_wall_forces(container_walls, reaction_forces_file, simulation_time);
-	//	if (cover)
-	//	  write_cover_data(cover, reaction_forces_file, simulation_time);
+	if (cover)
+	  write_cover_data(cover, reaction_forces_file, simulation_time);
 	GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
 	terminal_file << "Simulation is running. Current time step: " << simulation_time << "\n";
       }
@@ -624,7 +630,7 @@ int main(int argc, char* argv[]) {
 	GetLog() << "Simulation stopped. No particles in container.";
 	terminal_file << "Simulation stopped. No particles in container.";
       }
-      if (simulation_time > 0.002)
+      if (simulation_time > 0.5)
 #ifdef IRR
 	break;
 #else

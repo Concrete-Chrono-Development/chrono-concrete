@@ -242,6 +242,7 @@ class dfc_parameters {
         eta_inf_s = 50;
         mi_a_s = 0.5;
         t = 2.5e-3;
+	lambda = 0;
       }
       /// Mortar to mortar and mortar to aggregate stiffness
       real E_Nm;
@@ -282,6 +283,8 @@ class dfc_parameters {
       real mi_a_s;
       /// thickness of mortar layer on surfaces
       real t;
+      /// flocculation parameter
+      real lambda;
 };
 
 /// Aggregate of all settings for Chrono::Multicore.

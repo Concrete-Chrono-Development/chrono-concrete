@@ -617,6 +617,8 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real mi_a;
     /// thickness of mortar layer on surfaces
     real t;
+    /// flocculation parameter
+    real lambda;
     if (radiuses[index].x != -1 && radiuses[index].y != -1) {   // both contacting shapes are spheres
         E_Nm = param.E_Nm;
         E_Na = param.E_Na;
@@ -630,6 +632,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         n = param.n;
         mi_a = param.mi_a;
         t = 0;
+	lambda = param.lambda;
     } else {  // any of the contacting shapes is not a sphere
         E_Nm = param.E_Nm_s;
         E_Na = param.E_Na_s;
@@ -643,6 +646,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         n = param.n;
         mi_a = param.mi_a_s;
         t = param.t;
+	lambda = param.lambda;
     }
     // Identify the two shapes in contact (global shape IDs).
     int s1 = shape_pairs[index].x;
@@ -733,6 +737,12 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 u_IJ_dt_vec =  vel_J - vel_I;
     real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
     real3 e_IJ_ML_vec;
+    real3 u_IJ_dt_vec_norm;
+    if (Length(u_IJ_dt_vec) != 0) {
+      u_IJ_dt_vec_norm = u_IJ_ML_dt_vec / Length(u_IJ_ML_dt_vec);
+    } else {
+      u_IJ_dt_vec_norm = real3(0, 0, 0);
+    }
     real3 u_IJ_ML_dt_vec_norm;
     if (Length(u_IJ_ML_dt_vec) != 0) {
       u_IJ_ML_dt_vec_norm = u_IJ_ML_dt_vec / Length(u_IJ_ML_dt_vec);
@@ -809,13 +819,15 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     
     // Calculate strain rates
     real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
-    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;  //previous code:Length(u_IJ_ML_dt_vec)
+    // dot product was introduced to get sign for epsilon_IJ_ML_dt, it is relevant for stiffness
+    // stress at hard contact epsilon_N < -epsilon_a
+    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;
 
     // Calculate gamma0 prim
     real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
 
     // Calculate gamma prim
-    real gamma_dt = Sqrt(beta * Pow(epsilon_IJ_N_dt, 2) + Pow(epsilon_IJ_ML_dt, 2));
+    real gamma_dt = Sqrt(beta * Pow(epsilon_IJ_N_dt, 2) + Pow(Length(u_IJ_ML_dt_vec) / l_IJ, 2));
 
     // Calculate eta_gamma prim
     real eta_gamma_dt;
@@ -827,9 +839,14 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     }
 
     // Calculate viscous stresses
-    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
+    //    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
     //real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
-    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
+    //    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
+    // this quantity was introduced to correct mistake in equation 6 of reference paper
+    // it is direct implementation of this equation
+    real sigma_tau = eta_gamma_dt * gamma_dt + (1 + lambda) * sigma_tau0;
+    // obtain the vector by multiplying scalar stress by unit vector of relative veloctiy
+    real3 sigma_tau_vec = sigma_tau * u_IJ_dt_vec_norm;
 
     // Calculate epsilon_N
     real epsilon_N;
@@ -930,8 +947,8 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     }
     
     // Calculate contact force
-    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-      (sigma_ML_s) * A_IJ * e_IJ_ML_vec + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm;
+    real3 contact_force = (sigma_N_s) * A_IJ * e_IJ_N_vec + (sigma_ML_s) * A_IJ * e_IJ_ML_vec +
+      sigma_tau_vec * A_IJ;
 
     // Convert force into the local body frames and calculate induced torques
     //    n' = s' x F' = s' x (A*F)
