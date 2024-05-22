@@ -742,7 +742,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 e_IJ_ML_vec;
     real3 u_IJ_dt_vec_norm;
     if (Length(u_IJ_dt_vec) != 0) {
-      u_IJ_dt_vec_norm = u_IJ_ML_dt_vec / Length(u_IJ_ML_dt_vec);
+      u_IJ_dt_vec_norm = u_IJ_dt_vec / Length(u_IJ_dt_vec);
     } else {
       u_IJ_dt_vec_norm = real3(0, 0, 0);
     }
