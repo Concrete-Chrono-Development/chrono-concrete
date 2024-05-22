@@ -648,6 +648,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         t = param.t;
 	lambda = param.lambda;
     }
+    bool debug_verbose = param.debug_verbose;
+    std::vector<vec2> debug_contact_pairs = param.debug_contact_pairs;
+    
     // Identify the two shapes in contact (global shape IDs).
     int s1 = shape_pairs[index].x;
     int s2 = shape_pairs[index].y;
@@ -787,15 +790,6 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 	} else {
 	  e_IJ_ML_vec = real3(0, 0, 0);
 	}
-	/*
-        if (Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z())) == 0) {
-            e_IJ_ML_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z());
-        }
-        else if(Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z())) == 0){ 
-            e_IJ_ML_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z());
-        } else {
-            std::cout << "Definition of tangent direction failed. Check the problem.";
-	    }*/
     } else {
       auto global_tangent_direction1 = chrono::ChVector(0, 1, 0);
       auto global_tangent_direction2 = chrono::ChVector(0, 0, 1);
@@ -931,13 +925,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
             sigma_N_s = input_sigma_N_s;
             if (abs(input_sigma_ML_s) <= abs(mi_a * sigma_N_s)) {
                 sigma_ML_s = input_sigma_ML_s;
-		//GetLog() << "Aggregate to aggregate. Input sigma smaller than friction limit.";
-		//GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             else {
                 sigma_ML_s = mi_a * abs(sigma_N_s) * Sign(input_sigma_ML_s);
-		//GetLog() << "Aggregate to aggregate. Input sigma greater than friction limit.";
-		//GetLog() << " Value of sigma_ML_s: " << sigma_ML_s << "\n";
             }
             delta_sigma_N_s = E_Na * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = alfa_a * E_Na * epsilon_IJ_ML_dt *dT;
@@ -957,35 +947,6 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     contact_torque_I = Cross(a_I_vec_loc, RotateT(contact_force, rot[body_I]));
     contact_torque_J = Cross(a_J_vec_loc, RotateT(contact_force, rot[body_J]));
 			     
-    /*
-    if (R_I != -1 and R_J != -1){
-      contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
-			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-				       sigma_ML_s * A_IJ * e_IJ_ML_vec
-				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
-      contact_torque_J = Cross(RotateT(a_J_vec, rot[body_J]),
-			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-				       sigma_ML_s * A_IJ * e_IJ_ML_vec
-				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
-    } else if (R_I == -1) {
-      contact_torque_I = Cross(a_I_vec,
-			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-				       sigma_ML_s * A_IJ * e_IJ_ML_vec
-				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
-      contact_torque_J = Cross(RotateT(a_J_vec, rot[body_J]),
-			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-				       sigma_ML_s * A_IJ * e_IJ_ML_vec
-				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
-    } else {
-      contact_torque_I = Cross(RotateT(a_I_vec, rot[body_I]),
-			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-				       sigma_ML_s * A_IJ * e_IJ_ML_vec
-				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_I]));
-      contact_torque_J = Cross(a_J_vec,
-			       RotateT((sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
-				       sigma_ML_s * A_IJ * e_IJ_ML_vec
-				       + sigma_ML_tau * A_IJ * u_IJ_ML_dt_vec_norm, rot[body_J]));
-				       } */
     // Increment stored stiffness stresses and return contact force and torque
     DFC_stress[ctSaveId].x += delta_sigma_N_s;
     DFC_stress[ctSaveId].y += delta_sigma_ML_s;
@@ -999,6 +960,72 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     ct_torque[2 * index + 1] = -contact_torque_J;
 
     
+    if (debug_verbose) {
+      for (auto i : debug_contact_pairs) {
+	if ((i[0] == body_I && i[1] == body_J) || (i[0] == body_J && i[1] == body_I)) {
+	  std::ofstream DFC_contact_param;
+	  std::string body_I_str = std::to_string(body_I);
+	  std::string body_J_str = std::to_string(body_J);
+	  DFC_contact_param.open("contact_data_bodies_" + body_I_str + "_" +
+				 body_J_str + ".txt", std::ios_base::app);
+	  DFC_contact_param << "Data of body " << body_I_str << ":\n";
+	  DFC_contact_param << "Radius: " << R_I << "\n";
+	  DFC_contact_param << "Contact points coordinates: [" << pt_I.x << ", "
+			    << pt_I.y << ", " << pt_I.z  << "]\n";
+	  DFC_contact_param << "Position: [" << pos[body_I].x << ", " << pos[body_I].y
+			    << ", " << pos[body_I].z << "]\n";
+	  DFC_contact_param << "Linear body velocity: " << v_body_I.x << ", " << v_body_I.y
+			    << ", " << v_body_I.z << "]\n";
+	  DFC_contact_param << "Angular body velocity: " << o_body_I.x << ", " << o_body_I.y
+			    << ", " << o_body_I.z << "]\n";
+	  DFC_contact_param << "Velocity of contact point: " << vel_I.x << ", " << vel_I.y
+			    << ", " << vel_I.z << "]\n\n";
+	  
+	  DFC_contact_param << "Data of body " << body_J_str << ":\n";
+	  DFC_contact_param << "Radius: " << R_J << "\n";
+	  DFC_contact_param << "Contact points coordinates: [" << pt_J.x << ", "
+			    << pt_J.y << ", " << pt_J.z  << "]\n";
+	  DFC_contact_param << "Position: [" << pos[body_J].x << ", " << pos[body_J].y
+			    << ", " << pos[body_J].z << "]\n";
+	  DFC_contact_param << "Linear body velocity: " << v_body_J.x << ", " << v_body_J.y
+			    << ", " << v_body_J.z << "]\n";
+	  DFC_contact_param << "Angular body velocity: " << o_body_J.x << ", " << o_body_J.y
+			    << ", " << o_body_J.z << "]\n";
+	  DFC_contact_param << "Velocity of contact point: " << vel_J.x << ", " << vel_J.y
+			    << ", " << vel_J.z << "]\n\n";
+	  
+	  DFC_contact_param << "Contact data: \n";
+	  DFC_contact_param << "Contact depth (calculated by solver): " << depth[index] << "\n";
+	  DFC_contact_param << "Normal direction (calculated by solver): [" << normal[index].x
+			    << " ," << normal[index].y << ", " << normal[index].z << "]\n";
+	  DFC_contact_param << "Vector e_IJ_N_vec: [" << e_IJ_N_vec.x << ", "
+			    << e_IJ_N_vec.y << ", " << e_IJ_N_vec.z << "]\n";
+	  DFC_contact_param << "Relative velocity at contact point u_IJ_dt_vec: [" << u_IJ_dt_vec.x
+			    << ", " << u_IJ_ML_dt_vec.y << ",  " << u_IJ_ML_dt_vec.z << "]\n";
+	  DFC_contact_param << "Relative tangent velocity at contact point u_IJ_ML_dt_vec: ["
+			    << u_IJ_ML_dt_vec.x << ", " << u_IJ_ML_dt_vec.y << ", "
+			    << u_IJ_ML_dt_vec.z << "]\n";
+	  DFC_contact_param << "Scalar epsilon_IJ_N_dt: " << epsilon_IJ_N_dt << "\n";
+	  DFC_contact_param << "Scalar epsilon_IJ_ML_dt for viscous stress: " <<
+	    (Length(u_IJ_ML_dt_vec) / l_IJ) << "\n";
+	  DFC_contact_param << "Scalar viscous stress sigma_tau: (Eq. 6) " << sigma_tau << "\n";
+	  DFC_contact_param << "Vector viscous stress sigma_tau_vec: " << sigma_tau_vec << "\n";
+	  DFC_contact_param << "Normal strain epsilon_N: " << epsilon_N << "\n" ;
+	  DFC_contact_param << "Strain at aggregate contact epsilon_a: " << epsilon_a << "\n";
+	  DFC_contact_param << "Input normal stress input_sigma_N_s: " << input_sigma_N_s << "\n";
+	  DFC_contact_param << "Input tangent stress input_sigma_ML_s: " << input_sigma_ML_s << "\n";
+	  DFC_contact_param << "Increase of normal stiffness stress delta_sigma_N_s: " <<
+	    delta_sigma_N_s << "\n";
+	  DFC_contact_param << "Increase of tangent stiffness stress delta_sigma_ML_s: " <<
+	    delta_sigma_ML_s << "\n";
+	  DFC_contact_param << "Contact force: [" << contact_force.x << ", "
+			    << contact_force.y << ", " << contact_force.z << "]\n";
+	  DFC_contact_param << "Contact torque: " << contact_torque_I.x << ", "
+			    << contact_torque_I.y << ", " << contact_torque_I.z << "]\n";
+	  DFC_contact_param << "/////////////////////////////////////////////// \n\n\n";
+	}
+      }
+    }
     // only for validation purposes
     /*
     std::ofstream DFC_strain_stress;

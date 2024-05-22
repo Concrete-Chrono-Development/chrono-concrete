@@ -243,6 +243,7 @@ class dfc_parameters {
         mi_a_s = 0.5;
         t = 2.5e-3;
 	lambda = 0;
+	debug_verbose = false;
       }
       /// Mortar to mortar and mortar to aggregate stiffness
       real E_Nm;
@@ -285,6 +286,11 @@ class dfc_parameters {
       real t;
       /// flocculation parameter
       real lambda;
+      /// Debug control, if debug_verbose is true, the implementation will print detailed contact
+      /// data for all contact pairs stored in vector, probably there is better place to
+      /// store this parameters as they are not relevant for model itself
+      bool debug_verbose;
+      std::vector<vec2> debug_contact_pairs;
 };
 
 /// Aggregate of all settings for Chrono::Multicore.

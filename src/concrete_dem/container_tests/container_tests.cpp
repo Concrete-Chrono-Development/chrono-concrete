@@ -393,6 +393,22 @@ bool any_particle_inside(ChSystemMulticore& sys){
    return false;
 }
 
+// find particle with highest coordinate of contact surface along z-direction, returns index
+unsigned int find_particle_highest_z(ChSystemMulticoreSMC& sys) {
+  double current_z_max = 0;
+  unsigned int index = 0;
+  auto body_list = sys.Get_bodylist();
+  for (auto body : body_list) {
+    if (body->GetIdentifier() > 0) {
+      if (body->GetPos().z() + body->GetCollisionModel()->GetShapeDimensions(0)[0] > current_z_max ) {
+	current_z_max = body->GetPos().z() + body->GetCollisionModel()->GetShapeDimensions(0)[0];
+	index = body->GetId();
+      }
+    }
+  }
+  return index;
+}
+
 // function printing current energy status
 ChVector<> print_energy_status(ChSystemMulticore& sys){
   float total_trans_kin_e = 0;
@@ -533,6 +549,7 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;
   sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;
   sys.GetSettings()->dfc_contact_param.t = 4e-3/2;
+  sys.GetSettings()->dfc_contact_param.debug_verbose = true;
   sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
   //real tolerance = 1e-3;
   //uint max_iteration = 100;
@@ -550,6 +567,7 @@ int main(int argc, char* argv[]) {
   //  read_particles_VTK(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk");
   read_particles_VTK_inside(sys, "OUT_VTK_DeCompres_Set_0_run_0/particle_time_steps_00500.vtk", 0.15);
 
+
   double simulation_time = 0;
   double time_step = 1e-06;
   // time interval for data storage expressed in simulation steps
@@ -562,7 +580,7 @@ int main(int argc, char* argv[]) {
 
   std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
   std::string contact_forces_file = out_dir + "/wall_contact_forces.txt";
-  
+
   //std::vector<std::shared_ptr<ChBody>> list_of_particles_to_delete;
   //list_of_particles_to_delete = list_particle_for_removal(sys, 0.15);
 
@@ -578,6 +596,9 @@ int main(int argc, char* argv[]) {
   //sys.Update();
   //GetLog() << "Iteratively deleted particle: " << i->GetId() << "\n";
   // }
+  std::vector<vec2> pair_to_debug;
+  pair_to_debug.push_back(vec2(cover->GetId(), highest_particle_index));
+  sys.GetSettings()->dfc_contact_param.debug_contact_pairs = pair_to_debug;
   #ifdef IRR
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
