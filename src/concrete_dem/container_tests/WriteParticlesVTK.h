@@ -6,7 +6,7 @@
 // Authors: Bahar Ayhan, Mariusz Warzecha
 // =============================================================================
 //
-// Header file with the implementation of VTK export function
+// Header file with the implementation of VTK export and import function
 
 #ifndef WRITEPARTICLESVTK_H
 #define WRITEPARTICLESVTK_H
@@ -412,5 +412,123 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
 #endif
     sys.AddBody(ball);
   }
+}
+
+
+void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
+				    const std::string& particle_coords,
+				    const std::string& particle_radii,
+				    bool limit_heigth,
+				    double height_limit){
+  // open both files
+  std::ifstream vtk_file_coords(particle_coords);
+  if (!vtk_file_coords.is_open()) {
+    std::cerr << "Error: unable to open file " << particle_coords << "\n";
+  }
+  std::ifstream vtk_file_radii(particle_radii);
+  if (!vtk_file_radii.is_open()) {
+    std::cerr << "Error: unable to open file " << particle_radii << "\n";
+  }
+
+  // read number of particles
+  int particle_number = 0;
+  std::string line;
+  while (std::getline(vtk_file_coords, line)) {
+    if (line.find("POINTS") != std::string::npos) {
+      std::istringstream iss(line);
+      std::string temp;
+      while (!iss.eof()) {
+	iss >> temp;  // read one word and move to next one
+	if (std::stringstream(temp) >> particle_number)  // is true if temp is an int number
+	  break;
+      }
+      break;
+    }
+  }
+
+  // read particle positions
+  std::vector<ChVector<>> particle_pos;
+  std::string temp;
+  float temp_number;
+  std::getline(vtk_file_coords, line);  // just to skip one line 
+  for (int i = 0; i < particle_number; ++i){
+    std::getline(vtk_file_coords, line);
+    std::istringstream iss(line);
+    std::vector<float> coordinates;
+    while (!iss.eof()) {
+      iss >> temp;
+      std::stringstream(temp) >> temp_number;
+      coordinates.push_back(0.001*temp_number);  // scale to meters
+    }
+    particle_pos.push_back(ChVector<>(coordinates[0], coordinates[2], coordinates[1]));
+  }
+
+  // read particle radii
+  std::vector<float> particle_radiuses;
+  while (std::getline(vtk_file_radii, line)) {
+    if (line.find("LOOKUP_TABLE") != std::string::npos) {
+      for (int i = 0; i < particle_number; ++i) {
+	std::getline(vtk_file_radii, line);
+	std::istringstream iss(line);
+	float temp_radius;
+	iss >> temp_radius;
+	particle_radiuses.push_back(0.001*temp_radius);  // scale to meters
+      }
+      break;
+    }
+  }
+
+  // create particles
+  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  material->SetYoungModulus(2.05e11);
+  material->SetPoissonRatio(0.3);
+  material->SetRestitution(0.5);
+  material->SetFriction(0.2);
+
+  // calculate updated density
+  double density_old = 797 * (1 + 0.4 + 2.25);
+  double V_l = 0;  // volume of particles in container
+  for (int i = 0; i < particle_number; ++i) {
+    V_l += double(4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3);
+  }
+  double density_new = (density_old * 0.15 * 0.15 * 0.15) / V_l;
+  GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
+  GetLog() << "Total volume of particles in container: " << V_l << "\n";
+  GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
+
+  for (int i = 0; i < particle_number; ++i) {
+    if (limit_heigth)
+      if (particle_pos[i].z() > height_limit ||
+	  particle_pos[i] < 0 || abs(particle_pos[i].x()) > height_limit/2 ||
+	  abs(particle_pos[i].y()) > height_limit/2)
+	continue; 
+    auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+    double mass = (double(4.0 / 3.0) * 3.141592653589793238462 *
+		   pow(particle_radiuses[i], 3)) * density_new;
+    ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
+		       chrono::ChVector<>(1, 1, 1));
+    ball->SetMass(mass);
+    ball->SetPos(particle_pos[i]);
+    ball->SetPos_dt(ChVector<>(0, 0, 0));
+    ball->SetWvel_par(ChVector<>(0, 0, 0));
+    ball->GetCollisionModel()->ClearModel();
+    utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
+    ball->SetBodyFixed(false);
+    ball->SetCollide(true);
+    ball->GetCollisionModel()->BuildModel();
+#ifdef IRR
+    auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
+    sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
+    sphere1->SetOpacity(0.4f);
+    auto sphere2 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i] - 4e-3);
+    sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
+    auto ball_vis = chrono_types::make_shared<ChVisualModel>();
+    ball_vis->AddShape(sphere1);
+    ball_vis->AddShape(sphere2);
+    ball->AddVisualModel(ball_vis);
+#endif
+    sys.AddBody(ball);
+  }
+  
 }
 #endif
