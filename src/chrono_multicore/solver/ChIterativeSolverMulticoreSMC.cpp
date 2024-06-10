@@ -740,12 +740,6 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 u_IJ_dt_vec =  vel_J - vel_I;
     real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
     real3 e_IJ_ML_vec;
-    real3 u_IJ_dt_vec_norm;
-    if (Length(u_IJ_dt_vec) != 0) {
-      u_IJ_dt_vec_norm = u_IJ_dt_vec / Length(u_IJ_dt_vec);
-    } else {
-      u_IJ_dt_vec_norm = real3(0, 0, 0);
-    }
     real3 u_IJ_ML_dt_vec_norm;
     if (Length(u_IJ_ML_dt_vec) != 0) {
       u_IJ_ML_dt_vec_norm = u_IJ_ML_dt_vec / Length(u_IJ_ML_dt_vec);
@@ -824,23 +818,22 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real gamma_dt = Sqrt(beta * Pow(epsilon_IJ_N_dt, 2) + Pow(Length(u_IJ_ML_dt_vec) / l_IJ, 2));
 
     // Calculate eta_gamma prim
-    real eta_gamma_dt;
-    if (gamma_dt <= gamma_0_dt) {
-        eta_gamma_dt = kappa_0 * eta_inf;
+    // continuous implementation for flocculation parameter 
+    real eta_gamma_dt  = 0;
+    real g_lambda = 1;
+    if (gamma_dt != 0) {
+      eta_gamma_dt = (1 - exp(-Abs(gamma_dt)/gamma_0_dt)) *
+	(sigma_tau0 * (1 + lambda) / Abs(gamma_dt) + eta_inf * g_lambda);
+    } else {
+      eta_gamma_dt = sigma_tau0 * (1 + lambda) / gamma_0_dt; 
     }
-    else {
-        eta_gamma_dt = eta_inf * Pow(Abs(gamma_dt), n-1);
-    }
-
+    
     // Calculate viscous stresses
-    //    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
+    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
     //real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
-    //    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
-    // this quantity was introduced to correct mistake in equation 6 of reference paper
-    // it is direct implementation of this equation
-    real sigma_tau = eta_gamma_dt * gamma_dt + (1 + lambda) * sigma_tau0;
-    // obtain the vector by multiplying scalar stress by unit vector of relative veloctiy
-    real3 sigma_tau_vec = sigma_tau * u_IJ_dt_vec_norm;
+    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
+
+
 
     // Calculate epsilon_N
     real epsilon_N;
@@ -937,8 +930,8 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     }
     
     // Calculate contact force
-    real3 contact_force = (sigma_N_s) * A_IJ * e_IJ_N_vec + (sigma_ML_s) * A_IJ * e_IJ_ML_vec +
-      sigma_tau_vec * A_IJ;
+    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec +
+      (sigma_ML_s) * A_IJ * e_IJ_ML_vec + sigma_ML_tau*A_IJ*u_IJ_ML_dt_vec_norm;
 
     // Convert force into the local body frames and calculate induced torques
     //    n' = s' x F' = s' x (A*F)
@@ -1008,8 +1001,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 	  DFC_contact_param << "Scalar epsilon_IJ_N_dt: " << epsilon_IJ_N_dt << "\n";
 	  DFC_contact_param << "Scalar epsilon_IJ_ML_dt for viscous stress: " <<
 	    (Length(u_IJ_ML_dt_vec) / l_IJ) << "\n";
-	  DFC_contact_param << "Scalar viscous stress sigma_tau: (Eq. 6) " << sigma_tau << "\n";
-	  DFC_contact_param << "Vector viscous stress sigma_tau_vec: " << sigma_tau_vec << "\n";
+	  DFC_contact_param << "Scalar viscous normal stress sigma_N_tau:" << sigma_N_tau << "\n";
+	  DFC_contact_param << "Scalar viscous tangent stress sigma_ML_tau " << sigma_ML_tau << "\n";
+	  DFC_contact_param << "Value of eta_gamma_dt parameter (continuous)" << eta_gamma_dt << "\n";
 	  DFC_contact_param << "Normal strain epsilon_N: " << epsilon_N << "\n" ;
 	  DFC_contact_param << "Strain at aggregate contact epsilon_a: " << epsilon_a << "\n";
 	  DFC_contact_param << "Input normal stress input_sigma_N_s: " << input_sigma_N_s << "\n";

@@ -395,8 +395,8 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
     ball->SetBodyFixed(false);
     // ball->SetLimitSpeed(true);
-    // ball->SetMaxSpeed(.2);
-    // ball->SetMaxWvel(.2);
+    //ball->SetMaxSpeed(25);
+    //ball->SetMaxWvel(25);
     ball->SetCollide(true);
     ball->GetCollisionModel()->BuildModel();
 #ifdef IRR
@@ -489,6 +489,11 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
   double density_old = 797 * (1 + 0.4 + 2.25);
   double V_l = 0;  // volume of particles in container
   for (int i = 0; i < particle_number; ++i) {
+    if (limit_heigth)
+      if (particle_pos[i].z() > height_limit ||
+	  particle_pos[i] < 0 || abs(particle_pos[i].x()) > height_limit/2 ||
+	  abs(particle_pos[i].y()) > height_limit/2)
+	continue; 
     V_l += double(4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3);
   }
   double density_new = (density_old * 0.15 * 0.15 * 0.15) / V_l;
@@ -511,6 +516,9 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
     ball->SetPos(particle_pos[i]);
     ball->SetPos_dt(ChVector<>(0, 0, 0));
     ball->SetWvel_par(ChVector<>(0, 0, 0));
+    // ball->SetLimitSpeed(true);
+    //ball->SetMaxSpeed(10);
+    //ball->SetMaxWvel(10);
     ball->GetCollisionModel()->ClearModel();
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
     ball->SetBodyFixed(false);

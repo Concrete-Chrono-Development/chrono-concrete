@@ -496,12 +496,12 @@ int main(int argc, char* argv[]) {
   GetLog() << "Based on open source library projectchrono.org Chrono version: "
 	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
-  std::string out_dir = "OUT_VTK_DeCompres_Set_0_run_1";
+  std::string out_dir = "OUT_VTK_DeComp_Set_0_Bahar_start";
   if (!filesystem::create_directory(filesystem::path(out_dir))) {
     std::cerr << "Error creating directory" << out_dir << std::endl;
     return 1;
   }
-  std::string terminal_log_file = out_dir + "/DeCompres_Set_0_terminal_log.txt";
+  std::string terminal_log_file = out_dir + "/DeComp_Set_0_terminal_log.txt";
   std::ofstream terminal_file(terminal_log_file);
   terminal_file << "Test application for implementation of DFC model in chrono::multicore\n";
   terminal_file << "Based on open source library projectchrono.org Chrono version: "
@@ -549,7 +549,7 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;
   sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;
   sys.GetSettings()->dfc_contact_param.t = 4e-3/2;
-  sys.GetSettings()->dfc_contact_param.debug_verbose = true;
+  sys.GetSettings()->dfc_contact_param.debug_verbose = false;
   sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
   //real tolerance = 1e-3;
   //uint max_iteration = 100;
@@ -562,11 +562,15 @@ int main(int argc, char* argv[]) {
   std::shared_ptr<ChBody> cover;
   //cover = add_cover_formwork_pressure(sys, 0.15);
 
-  // AddSphereLayers(36, 11, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
-  //AddSphereLayers(4, 15, 0.405, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  //  AddSphereLayers(36, 11, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  //  AddSphereLayers(4, 15, 0.405, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
   //  read_particles_VTK(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk");
-  read_particles_VTK_inside(sys, "OUT_VTK_DeCompres_Set_0_run_0/particle_time_steps_00500.vtk", 0.15);
-
+  read_particles_VTK_inside(sys, "OUT_VTK_AGV_Set_0_Bahar_start/particle_time_steps_00500.vtk", 0.15);
+  // read_particles_VTK_Bahar_files(sys, "Bahar_start_system/particle_S1_coords.dat",
+  //				 "Bahar_start_system/particle_S1_radius.dat", true, 0.145);
+  //std::shared_ptr<ChBody> sphere_1, sphere_2;
+  //sphere_1 = AddSphere(sys, ChVector<>(0, 0, 0.15), ChVector<>(0, 0, 0), 10);
+  //sphere_2 = AddSphere(sys, ChVector<>(0.010, 0, 0.15), ChVector<>(0, 0, 0), 11);
 
   double simulation_time = 0;
   double time_step = 1e-06;
@@ -596,9 +600,9 @@ int main(int argc, char* argv[]) {
   //sys.Update();
   //GetLog() << "Iteratively deleted particle: " << i->GetId() << "\n";
   // }
-  std::vector<vec2> pair_to_debug;
-  pair_to_debug.push_back(vec2(cover->GetId(), highest_particle_index));
-  sys.GetSettings()->dfc_contact_param.debug_contact_pairs = pair_to_debug;
+  //std::vector<vec2> pair_to_debug;
+  //pair_to_debug.push_back(vec2(sphere_1->GetId(), sphere_2->GetId()));
+  //sys.GetSettings()->dfc_contact_param.debug_contact_pairs = pair_to_debug;
   #ifdef IRR
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
