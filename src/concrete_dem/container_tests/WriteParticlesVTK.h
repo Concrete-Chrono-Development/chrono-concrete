@@ -445,7 +445,7 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
       break;
     }
   }
-
+  GetLog() << "Particle number in the system: " << particle_number << "\n";
   // read particle positions
   std::vector<ChVector<>> particle_pos;
   std::string temp;
@@ -460,7 +460,18 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
       std::stringstream(temp) >> temp_number;
       coordinates.push_back(0.001*temp_number);  // scale to meters
     }
-    particle_pos.push_back(ChVector<>(coordinates[0], coordinates[2], coordinates[1]));
+    if (coordinates[0] > 0.15/2){
+      particle_pos.push_back(ChVector<>(coordinates[0] - 0.14/2, coordinates[1] - 0.15/2,
+					coordinates[2] + 3.6*0.15));
+    }
+    else if (coordinates[0] < -0.15/2) {
+      particle_pos.push_back(ChVector<>(coordinates[0] + 0.14/2, coordinates[1] - 0.15/2,
+					coordinates[2] + 3.6*0.15));
+    }
+    else {
+      particle_pos.push_back(ChVector<>(coordinates[0], coordinates[1] - 0.15/2,
+					coordinates[2] + 2*0.15));
+    }
   }
 
   // read particle radii
@@ -490,20 +501,20 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
   double V_l = 0;  // volume of particles in container
   for (int i = 0; i < particle_number; ++i) {
     if (limit_heigth)
-      if (particle_pos[i].z() > height_limit ||
+      if (particle_pos[i].z() > 3*height_limit ||
 	  particle_pos[i] < 0 || abs(particle_pos[i].x()) > height_limit/2 ||
 	  abs(particle_pos[i].y()) > height_limit/2)
-	continue; 
+	continue;
     V_l += double(4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3);
   }
   double density_new = (density_old * 0.15 * 0.15 * 0.15) / V_l;
   GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
   GetLog() << "Total volume of particles in container: " << V_l << "\n";
   GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
-
+  int particles_in_container = 0;
   for (int i = 0; i < particle_number; ++i) {
     if (limit_heigth)
-      if (particle_pos[i].z() > height_limit ||
+      if (particle_pos[i].z() > 3*height_limit ||
 	  particle_pos[i] < 0 || abs(particle_pos[i].x()) > height_limit/2 ||
 	  abs(particle_pos[i].y()) > height_limit/2)
 	continue; 
@@ -516,7 +527,7 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
     ball->SetPos(particle_pos[i]);
     ball->SetPos_dt(ChVector<>(0, 0, 0));
     ball->SetWvel_par(ChVector<>(0, 0, 0));
-    // ball->SetLimitSpeed(true);
+    //ball->SetLimitSpeed(true);
     //ball->SetMaxSpeed(10);
     //ball->SetMaxWvel(10);
     ball->GetCollisionModel()->ClearModel();
@@ -536,7 +547,8 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
     ball->AddVisualModel(ball_vis);
 #endif
     sys.AddBody(ball);
+    ++particles_in_container;
   }
-  
+  GetLog() << "Loaded particles - inside container: " << particles_in_container << "\n";
 }
 #endif

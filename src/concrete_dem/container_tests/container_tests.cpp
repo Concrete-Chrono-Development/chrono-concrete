@@ -566,8 +566,8 @@ int main(int argc, char* argv[]) {
   //  AddSphereLayers(4, 15, 0.405, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
   //  read_particles_VTK(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk");
   read_particles_VTK_inside(sys, "OUT_VTK_AGV_Set_0_Bahar_start/particle_time_steps_00500.vtk", 0.15);
-  // read_particles_VTK_Bahar_files(sys, "Bahar_start_system/particle_S1_coords.dat",
-  //				 "Bahar_start_system/particle_S1_radius.dat", true, 0.145);
+  //  read_particles_VTK_Bahar_files(sys, "Bahar_start_system/particle_S1_coords.dat",
+  //				 "Bahar_start_system/particle_S1_radius.dat", true, 1);
   //std::shared_ptr<ChBody> sphere_1, sphere_2;
   //sphere_1 = AddSphere(sys, ChVector<>(0, 0, 0.15), ChVector<>(0, 0, 0), 10);
   //sphere_2 = AddSphere(sys, ChVector<>(0.010, 0, 0.15), ChVector<>(0, 0, 0), 11);
@@ -650,7 +650,7 @@ int main(int argc, char* argv[]) {
       ChVector<> temp_energy(print_energy_status(sys));
       terminal_file << "Total transnational kinetic energy: " << temp_energy.x();
       terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";      
-      if (!any_particle_inside(sys)){
+      if (!any_particle_inside(sys) && simulation_time > 0.35){
 	continue_simulation = false;
 	GetLog() << "Simulation stopped. No particles in container.";
 	terminal_file << "Simulation stopped. No particles in container.";
