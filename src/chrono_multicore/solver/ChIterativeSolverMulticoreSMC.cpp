@@ -967,11 +967,11 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 			    << pt_I.y << ", " << pt_I.z  << "]\n";
 	  DFC_contact_param << "Position: [" << pos[body_I].x << ", " << pos[body_I].y
 			    << ", " << pos[body_I].z << "]\n";
-	  DFC_contact_param << "Linear body velocity: " << v_body_I.x << ", " << v_body_I.y
+	  DFC_contact_param << "Linear body velocity: [" << v_body_I.x << ", " << v_body_I.y
 			    << ", " << v_body_I.z << "]\n";
 	  DFC_contact_param << "Angular body velocity: " << o_body_I.x << ", " << o_body_I.y
 			    << ", " << o_body_I.z << "]\n";
-	  DFC_contact_param << "Velocity of contact point: " << vel_I.x << ", " << vel_I.y
+	  DFC_contact_param << "Velocity of contact point: [" << vel_I.x << ", " << vel_I.y
 			    << ", " << vel_I.z << "]\n\n";
 	  
 	  DFC_contact_param << "Data of body " << body_J_str << ":\n";
@@ -980,11 +980,11 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 			    << pt_J.y << ", " << pt_J.z  << "]\n";
 	  DFC_contact_param << "Position: [" << pos[body_J].x << ", " << pos[body_J].y
 			    << ", " << pos[body_J].z << "]\n";
-	  DFC_contact_param << "Linear body velocity: " << v_body_J.x << ", " << v_body_J.y
+	  DFC_contact_param << "Linear body velocity: [" << v_body_J.x << ", " << v_body_J.y
 			    << ", " << v_body_J.z << "]\n";
-	  DFC_contact_param << "Angular body velocity: " << o_body_J.x << ", " << o_body_J.y
+	  DFC_contact_param << "Angular body velocity: [" << o_body_J.x << ", " << o_body_J.y
 			    << ", " << o_body_J.z << "]\n";
-	  DFC_contact_param << "Velocity of contact point: " << vel_J.x << ", " << vel_J.y
+	  DFC_contact_param << "Velocity of contact point: [" << vel_J.x << ", " << vel_J.y
 			    << ", " << vel_J.z << "]\n\n";
 	  
 	  DFC_contact_param << "Contact data: \n";
@@ -994,7 +994,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 	  DFC_contact_param << "Vector e_IJ_N_vec: [" << e_IJ_N_vec.x << ", "
 			    << e_IJ_N_vec.y << ", " << e_IJ_N_vec.z << "]\n";
 	  DFC_contact_param << "Relative velocity at contact point u_IJ_dt_vec: [" << u_IJ_dt_vec.x
-			    << ", " << u_IJ_ML_dt_vec.y << ",  " << u_IJ_ML_dt_vec.z << "]\n";
+			    << ", " << u_IJ_dt_vec.y << ",  " << u_IJ_dt_vec.z << "]\n";
 	  DFC_contact_param << "Relative tangent velocity at contact point u_IJ_ML_dt_vec: ["
 			    << u_IJ_ML_dt_vec.x << ", " << u_IJ_ML_dt_vec.y << ", "
 			    << u_IJ_ML_dt_vec.z << "]\n";
@@ -1008,13 +1008,15 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 	  DFC_contact_param << "Strain at aggregate contact epsilon_a: " << epsilon_a << "\n";
 	  DFC_contact_param << "Input normal stress input_sigma_N_s: " << input_sigma_N_s << "\n";
 	  DFC_contact_param << "Input tangent stress input_sigma_ML_s: " << input_sigma_ML_s << "\n";
+	  DFC_contact_param << "Normal stiffness stress sigma_N_s: " << sigma_N_s << "\n";
+	  DFC_contact_param << "Tangent stiffness stress sigma_ML_s: " << sigma_ML_s << "\n";
 	  DFC_contact_param << "Increase of normal stiffness stress delta_sigma_N_s: " <<
 	    delta_sigma_N_s << "\n";
 	  DFC_contact_param << "Increase of tangent stiffness stress delta_sigma_ML_s: " <<
 	    delta_sigma_ML_s << "\n";
 	  DFC_contact_param << "Contact force: [" << contact_force.x << ", "
 			    << contact_force.y << ", " << contact_force.z << "]\n";
-	  DFC_contact_param << "Contact torque: " << contact_torque_I.x << ", "
+	  DFC_contact_param << "Contact torque: [" << contact_torque_I.x << ", "
 			    << contact_torque_I.y << ", " << contact_torque_I.z << "]\n";
 	  DFC_contact_param << "/////////////////////////////////////////////// \n\n\n";
 	}
