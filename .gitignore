@@ -149,3 +149,6 @@ src/chrono_granular/DoxyGenDocs/
 /GPATH
 /GRTAGS
 /GTAGS
+/src/concrete_dem/test_multicore_linux/.CMakeLists.txt.~undo-tree~
+/src/concrete_dem/test_multicore_linux/.config_commands.org.~undo-tree~
+/src/concrete_dem/test_multicore_linux/.test_multicore_linux.cpp.~undo-tree~

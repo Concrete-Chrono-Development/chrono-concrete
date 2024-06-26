@@ -1,0 +1,4 @@
+cmake -B ~/PROJECT_CHRONO/APP_DEBUG/test_multicore_linux \
+      -S ~/PROJECT_CHRONO/SRC/src/concrete_dem/test_multicore_linux \
+      -DCMAKE_BUILD_TYPE="Debug" \
+      -DCHRONO_LIBRARIES="/usr/local/lib/libChronoEngine.so;/usr/local/lib/libChronoEngine_irrlicht.so;/usr/local/lib/libChronoEngine_multicore.so;/usr/local/lib/libChronoEngine_postprocess.so"
