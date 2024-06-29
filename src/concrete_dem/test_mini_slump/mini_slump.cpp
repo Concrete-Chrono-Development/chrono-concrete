@@ -17,7 +17,7 @@
 //  This simulation uses different units mm, MPa, N, s
 
 // comment the line below two switch off irrlicht visualisation
-#define IRR
+//#define IRR
 
 #include <vector>
 #include "chrono_multicore/physics/ChSystemMulticore.h"
@@ -217,10 +217,10 @@ std::shared_ptr<ChBody> AddConicalContainer(ChSystemMulticoreSMC& sys,
   trimesh_shape->SetMesh(trimesh);
   trimesh_shape->SetName("Container 1");
   cylinder->AddVisualShape(trimesh_shape);
-  ChQuaternion<> q=Q_from_AngAxis(CH_C_PI_2, -VECT_X); //mini slump
+  ChQuaternion<> q=Q_from_AngAxis(CH_C_PI_2, VECT_X); //mini slump
   cylinder->SetRot(q);
   std::cout << "COG: " << cylinder->GetFrame_COG_to_abs().GetPos() << std::endl;
-  cylinder->SetPos(ChVector<>(0,27.0167,0));
+  cylinder->SetPos(ChVector<>(0,59,0));
   sys.AddBody(cylinder);
   return cylinder;		
 }
@@ -266,7 +266,7 @@ std::shared_ptr<ChBody> create_obstacle_body(ChSystemMulticore& sys){
   auto obstacle_body = std::shared_ptr<ChBody>(sys.NewBody());
   obstacle_body->SetMass(1);
   obstacle_body->SetInertiaXX(ChVector<>(1, 1, 1));
-  obstacle_body->SetPos(ChVector<>(0, 51, 0));
+  obstacle_body->SetPos(ChVector<>(0, 23, 0));
   obstacle_body->SetBodyFixed(true);
   obstacle_body->SetCollide(true);
   obstacle_body->GetCollisionModel()->ClearModel();
@@ -281,8 +281,12 @@ std::shared_ptr<ChBody> create_obstacle_body(ChSystemMulticore& sys){
   return obstacle_body;
 }
 
-void ReadDFCparticles(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis,
-		      std::string& data_path, std::string& file_name, double rho, double h_layer) {
+void ReadDFCparticles(ChSystem& sys, std::string& data_path, std::string& file_name,
+		      double rho, double h_layer
+		      #ifdef IRR
+		      ,std::shared_ptr<ChVisualSystemIrrlicht>& vis
+		      #endif
+		      ) {
   auto mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
   mat->SetYoungModulus(1e2); //2e3
   mat->SetFriction(0.5);
@@ -337,7 +341,8 @@ void ReadDFCparticles(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vi
     body->GetCollisionModel()->ClearModel();
     body->GetCollisionModel()->AddSphere(mat, radius);
     body->GetCollisionModel()->BuildModel();
-    body->SetCollide(true); 		
+    body->SetCollide(true);
+    #ifdef IRR
     auto sphereMor = chrono_types::make_shared<ChSphereShape>(radius);
     sphereMor->SetColor(ChColor(128.f/255, 128.f/255, 128.f/255));
     sphereMor->SetOpacity(0.25f);
@@ -345,7 +350,8 @@ void ReadDFCparticles(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vi
     auto sphereAgg = chrono_types::make_shared<ChSphereShape>(radius-h_layer);
     sphereAgg->SetColor(ChColor(5.f/255, 48.f/255, 173.f/255));	
     body->AddVisualShape(sphereAgg);
-    vis->BindItem(body);	
+    vis->BindItem(body);
+    #endif
     sys.AddBody(body);
     body->SetLimitSpeed(true);
     body->SetMaxSpeed(2000.);
@@ -374,8 +380,7 @@ int main(int argc, char* argv[]) {
   int pos = current_dir.find_last_of("/\\");
   current_dir = current_dir.substr(0, pos+1);
   ChSystemMulticoreSMC sys;
-  //sys.SetCollisionSystemType(collision_type);
-  sys.Set_G_acc(ChVector<>(0, -9.81, 0));
+  sys.Set_G_acc(ChVector<>(0, -9810, 0));
 
   // concrete and DFC parameters (SI units)
   double specimenVol=( CH_C_PI*pow(101.6/2,2)*50.8*2/3- CH_C_PI*pow(69.85/2,2)*50.8/3);
@@ -432,17 +437,20 @@ int main(int argc, char* argv[]) {
   double cyl_radius=100;
   double cyl_height=150;
   double density=7.8E-9;
-  /*  auto cylinder_body = AddConicalContainer(sys, mat, density*1000,
+  /*
+  auto cylinder_body = AddConicalContainer(sys, mat, density*1000,
 					   cyl_radius, cyl_height, current_dir);
   cylinder_body->GetVisualShape(0)->SetOpacity(0.4f);
   cylinder_body->GetCollisionModel()->SetFamilyGroup(2);
   cylinder_body->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+  cylinder_body->SetBodyFixed(true);
+  
   auto cylinder_body2 = AddConicalContainer2(sys, mat, density,
 					     cyl_radius, cyl_height, current_dir);
   cylinder_body2->GetVisualShape(0)->SetOpacity(0.4f);
   cylinder_body2->SetBodyFixed(true);
   cylinder_body2->SetCollide(true);
-  auto obstacle_body = create_obstacle_body(sys); */
+  auto obstacle_body = create_obstacle_body(sys);*/
   
   double simulation_time = 0;
   double time_step = 1e-06;
@@ -456,13 +464,12 @@ int main(int argc, char* argv[]) {
 
   std::string reaction_forces_file = out_dir + "/wall_reaction_forces.txt";
   std::string contact_forces_file = out_dir + "/wall_contact_forces.txt";
-
+  std::string data_path=current_dir;
+  std::string file_name="DFCgeo000-data-particles-mini-2x4-dist";
   #ifdef IRR
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
-  std::string data_path=current_dir;
-  std::string file_name="DFCgeo000-data-particles-mini-2x4-dist"; 
-  ReadDFCparticles(sys, vis_irr, data_path, file_name, rho, h_layer);
+  ReadDFCparticles(sys, data_path, file_name, rho, h_layer,  vis_irr);
   vis_irr->AttachSystem(&sys);
   vis_irr->SetWindowSize(800, 600);
   vis_irr->SetWindowTitle("SMC callbacks");
@@ -472,6 +479,10 @@ int main(int argc, char* argv[]) {
   vis_irr->AddCamera(ChVector<>(200, 200, -300));
   vis_irr->AddTypicalLights();
   vis = vis_irr;
+  #endif
+  #ifndef IRR
+  ReadDFCparticles(sys, data_path, file_name, rho, h_layer);
+  GetLog() << "Particle Read";
   #endif
 #ifdef IRR
   while (vis->Run()) {
@@ -484,6 +495,20 @@ int main(int argc, char* argv[]) {
 #endif
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
+    if (register_data) {
+      if (std::fmod(step_num, save_step) == 0) {
+	std::string file_name = out_dir + generate_file_name("/particle_time_steps", saved_steps);
+	write_particles_VTK(sys, file_name);
+	++saved_steps;
+	GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
+	terminal_file << "Simulation is running. Current time step: " << simulation_time << "\n";
+      }
+    }
+    if (std::fmod(step_num, 1000) == 0){
+      ChVector<> temp_energy(print_energy_status(sys));
+      terminal_file << "Total translation kinetic energy: " << temp_energy.x(); // 
+      terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";
+    }
     if (simulation_time > 0.5)
 #ifdef IRR
 	break;
