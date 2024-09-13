@@ -119,9 +119,9 @@ std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVect
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
   material->SetFriction(0.2);
-  double radius = 0.008;   // in meters, I have doubt about used units
-  double h = 4e-3;
-  double density = 797 * (1 + 0.4 + 2.25);
+  double radius = 6;
+  double h = 2;
+  double density = 797 * (1 + 0.4 + 2.25)*1e-12;
   double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * density;
   auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
   ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
@@ -204,7 +204,7 @@ std::shared_ptr<ChBody> AddConicalContainer(ChSystemMulticoreSMC& sys,
 					    std::string current_dir) {    // create cylinder
   const std::string path = current_dir + "minislump-Cut4.obj";
   auto cylinder = std::shared_ptr<ChBody>(sys.NewBody());
-  cylinder->SetMass(1);
+  cylinder->SetMass(0.0004567);  // in tones
   cylinder->SetInertiaXX(ChVector<>(1, 1, 1));
   cylinder->SetCollide(true);
   cylinder->SetBodyFixed(false);
@@ -353,9 +353,9 @@ void ReadDFCparticles(ChSystem& sys, std::string& data_path, std::string& file_n
     vis->BindItem(body);
     #endif
     sys.AddBody(body);
-    body->SetLimitSpeed(true);
-    body->SetMaxSpeed(2000.);
-    body->SetMaxWvel(2000.);       
+    //    body->SetLimitSpeed(true);
+    //    body->SetMaxSpeed(2000.);
+    //    body->SetMaxWvel(2000.);       
   }
 }
 
@@ -366,12 +366,12 @@ int main(int argc, char* argv[]) {
   GetLog() << "Based on open source library projectchrono.org Chrono version: "
 	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
-  std::string out_dir = "OUT_VTK_mini_slump_development";
+  std::string out_dir = "OUT_VTK_mini_slump_third_set";
   if (!filesystem::create_directory(filesystem::path(out_dir))) {
     std::cerr << "Error creating directory" << out_dir << std::endl;
     return 1;
   }
-  std::string terminal_log_file = out_dir + "/Mini_slump_Set_xx_terminal_log.txt";
+  std::string terminal_log_file = out_dir + "/Mini_slump_Set_3_terminal_log.txt";
   std::ofstream terminal_file(terminal_log_file);
   terminal_file << "Test application for implementation of DFC model in chrono::multicore\n";
   terminal_file << "Based on open source library projectchrono.org Chrono version: "
@@ -410,18 +410,18 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.h = h_layer;
   sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;
   sys.GetSettings()->dfc_contact_param.beta = 0.5;
-  sys.GetSettings()->dfc_contact_param.sigma_t = 1.0e-3;
-  sys.GetSettings()->dfc_contact_param.sigma_tau0 = 2.0e-4;
-  sys.GetSettings()->dfc_contact_param.eta_inf = 2.0e-5;
+  sys.GetSettings()->dfc_contact_param.sigma_t = 3.0e-4;
+  sys.GetSettings()->dfc_contact_param.sigma_tau0 = 3.0e-5;
+  sys.GetSettings()->dfc_contact_param.eta_inf = 1.5e-5;
   sys.GetSettings()->dfc_contact_param.kappa_0 = 100;
   sys.GetSettings()->dfc_contact_param.n = 1;
   sys.GetSettings()->dfc_contact_param.mi_a = 0.5;
   sys.GetSettings()->dfc_contact_param.E_Nm_s = 1.5e-2;
   sys.GetSettings()->dfc_contact_param.E_Na_s = 100;
   sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;
-  sys.GetSettings()->dfc_contact_param.sigma_t_s = 1.0e-3;
-  sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 2.0e-4;
-  sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;
+  sys.GetSettings()->dfc_contact_param.sigma_t_s = 3.0e-4;
+  sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 3.0e-5;
+  sys.GetSettings()->dfc_contact_param.eta_inf_s = 1.5e-5;
   sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;
   sys.GetSettings()->dfc_contact_param.t = h_layer/2;
   sys.GetSettings()->dfc_contact_param.debug_verbose = false;
@@ -441,9 +441,7 @@ int main(int argc, char* argv[]) {
   auto cylinder_body = AddConicalContainer(sys, mat, density*1000,
 					   cyl_radius, cyl_height, current_dir);
   cylinder_body->GetVisualShape(0)->SetOpacity(0.4f);
-  cylinder_body->GetCollisionModel()->SetFamilyGroup(2);
-  cylinder_body->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
-  cylinder_body->SetBodyFixed(true);
+  cylinder_body->SetBodyFixed(false);
   
   auto cylinder_body2 = AddConicalContainer2(sys, mat, density,
 					     cyl_radius, cyl_height, current_dir);
@@ -455,7 +453,7 @@ int main(int argc, char* argv[]) {
   double simulation_time = 0;
   double time_step = 1e-06;
   // time interval for data storage expressed in simulation steps
-  int save_step =  1e-3 / time_step;  
+  int save_step =  1e-2 / time_step;  
   bool switch_val = false;
   int saved_steps = 0;  // serves as index for file name generation
   bool register_data = true;
@@ -466,6 +464,7 @@ int main(int argc, char* argv[]) {
   std::string contact_forces_file = out_dir + "/wall_contact_forces.txt";
   std::string data_path=current_dir;
   std::string file_name="DFCgeo000-data-particles-mini-2x4-dist";
+  read_particles_VTK_inside(sys, "OUT_VTK_mini_slump_first_parameter_set_1_s/particle_time_steps_00100.vtk", 300);
   #ifdef IRR
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
@@ -481,8 +480,11 @@ int main(int argc, char* argv[]) {
   vis = vis_irr;
   #endif
   #ifndef IRR
-  ReadDFCparticles(sys, data_path, file_name, rho, h_layer);
-  GetLog() << "Particle Read";
+  //ReadDFCparticles(sys, data_path, file_name, rho, h_layer);
+  //auto ball =  AddSphere(sys, ChVector<>(0, 6, 0), ChVector<>(0, -1500, 0), 1);
+  //  std::vector<vec2> pair_to_debug;
+  //  pair_to_debug.push_back(vec2(floor_body->GetId(), cylinder_body->GetId()));
+  //  sys.GetSettings()->dfc_contact_param.debug_contact_pairs = pair_to_debug;
   #endif
 #ifdef IRR
   while (vis->Run()) {
@@ -493,6 +495,14 @@ int main(int argc, char* argv[]) {
 #else
   while (continue_simulation) {
 #endif
+    /*
+    ChQuaternion<> q=Q_from_AngAxis(CH_C_PI_2, VECT_X); //mini slump
+    cylinder_body->SetRot(q);
+    double y = cylinder_body->GetPos().y();
+    cylinder_body->SetPos(ChVector<>(0, y, 0));
+    if (cylinder_body->GetPos().y() < 52) {
+	cylinder_body->SetPos(ChVector<>(0, 52.0, 0));
+	}*/
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
     if (register_data) {
@@ -500,7 +510,7 @@ int main(int argc, char* argv[]) {
 	std::string file_name = out_dir + generate_file_name("/particle_time_steps", saved_steps);
 	write_particles_VTK(sys, file_name);
 	++saved_steps;
-	GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
+	GetLog() << "Simulation is running. Data saved. Current time step: " << simulation_time << "\n";
 	terminal_file << "Simulation is running. Current time step: " << simulation_time << "\n";
       }
     }
@@ -508,8 +518,18 @@ int main(int argc, char* argv[]) {
       ChVector<> temp_energy(print_energy_status(sys));
       terminal_file << "Total translation kinetic energy: " << temp_energy.x(); // 
       terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";
+      GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
+      /*
+      GetLog() << "Current position of cylinder body: " << cylinder_body->GetPos() << "\n";
+      GetLog() << "Current velocity of cylinder body: " << cylinder_body->GetPos_dt() << "\n";
+      GetLog() << "Current rotation of cylinder body: " << cylinder_body->GetRot() << "\n";
+      terminal_file << "Current position of cylinder body: " << cylinder_body->GetPos() << "\n";
+      terminal_file << "Current velocity of cylinder body: " << cylinder_body->GetPos_dt() << "\n";
+      */
     }
-    if (simulation_time > 0.5)
+    //    if (simulation_time >1)
+    //cylinder_body->SetCollide(false);
+    if (simulation_time > 4.5)
 #ifdef IRR
 	break;
 #else

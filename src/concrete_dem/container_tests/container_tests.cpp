@@ -118,7 +118,7 @@ void AddSphereLayers(int layer_number, int box_number, double start_height,
   material->SetFriction(0.2);
   double radius = 0;  0.5 * d_param.GetRandom();
   double box_size = d_param.GetMaxSize() + 0.001;  // max aggregate size + 1 mm for safety
-  double density = 797 * (1 + 0.4 + 2.25);
+  double density = 0.5* 797 * (1 + 0.4 + 2.25);
   double h = d_param.GetHLayer();
   double mass = 0;
   double shift_x[4] = {box_size/2, 0, -box_size/2, 0};
@@ -496,12 +496,12 @@ int main(int argc, char* argv[]) {
   GetLog() << "Based on open source library projectchrono.org Chrono version: "
 	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
-  std::string out_dir = "OUT_VTK_DeComp_Set_0_Bahar_start";
+  std::string out_dir = "OUT_VTK_AGV_Set_0_but_sigma_t_0_half_ro";
   if (!filesystem::create_directory(filesystem::path(out_dir))) {
     std::cerr << "Error creating directory" << out_dir << std::endl;
     return 1;
   }
-  std::string terminal_log_file = out_dir + "/DeComp_Set_0_terminal_log.txt";
+  std::string terminal_log_file = out_dir + "/AGV_Set_0_terminal_log.txt";
   std::ofstream terminal_file(terminal_log_file);
   terminal_file << "Test application for implementation of DFC model in chrono::multicore\n";
   terminal_file << "Based on open source library projectchrono.org Chrono version: "
@@ -535,7 +535,7 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.h = h_layer; // 1st param --> 0.75 / 1 / 1.10 / 1.20 / 1.40 
   sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;
   sys.GetSettings()->dfc_contact_param.beta = 0.5;
-  sys.GetSettings()->dfc_contact_param.sigma_t = 0.005e6;  // 3 rd param 0.25 / 0.50 / 1 / 2 / 4
+  sys.GetSettings()->dfc_contact_param.sigma_t = 0;//0.005e6;  3 rd param 0.25 / 0.50 / 1 / 2 / 4
   sys.GetSettings()->dfc_contact_param.sigma_tau0 = 0.0005e6;  // 4th param 0.25 / 0.50 / 1 / 2 / 4
   sys.GetSettings()->dfc_contact_param.eta_inf = 50;       /// 5th param 0.25 / 0.50 / 1 / 2 / 4
   sys.GetSettings()->dfc_contact_param.kappa_0 = 100;
@@ -544,7 +544,7 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.04e6;
   sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;
   sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;
-  sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.005e6;
+  sys.GetSettings()->dfc_contact_param.sigma_t_s = 0; //0.005e6;
   sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 0.0005e6;
   sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;
   sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;
@@ -562,10 +562,10 @@ int main(int argc, char* argv[]) {
   std::shared_ptr<ChBody> cover;
   //cover = add_cover_formwork_pressure(sys, 0.15);
 
-  //  AddSphereLayers(36, 11, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
-  //  AddSphereLayers(4, 15, 0.405, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  AddSphereLayers(36, 11, 0.007, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
+  AddSphereLayers(4, 15, 0.405, sys, DFCParticleDistr(5e-3, 10e-3, h_layer, 2.5));
   //  read_particles_VTK(sys, "OUT_VTK_AGV_Set_3/particle_time_steps_01000.vtk");
-  read_particles_VTK_inside(sys, "OUT_VTK_AGV_Set_0_Bahar_start/particle_time_steps_00500.vtk", 0.15);
+  //  read_particles_VTK_inside(sys, "OUT_VTK_DeComp_Set_0_Bahar_start/particle_time_steps_00500.vtk", 0.15);
   //  read_particles_VTK_Bahar_files(sys, "Bahar_start_system/particle_S1_coords.dat",
   //				 "Bahar_start_system/particle_S1_radius.dat", true, 1);
   //std::shared_ptr<ChBody> sphere_1, sphere_2;

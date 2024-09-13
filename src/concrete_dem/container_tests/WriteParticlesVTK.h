@@ -378,7 +378,8 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
   GetLog() << "Total volume of particles in container: " << V_l << "\n";
   GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
-
+  density_new = 845 * (1.0 + 0.21 + 1.2422) * 1e-12;
+  GetLog() << "Set new density manually. In tones. Change inf future" << density_new << "\n";
   for (int i = 0; i < particle_number; ++i) {
     if (particle_pos[i].z() > limit || particle_pos[i] < 0 || abs(particle_pos[i].x()) > limit/2 ||
 	abs(particle_pos[i].y()) > limit/2)

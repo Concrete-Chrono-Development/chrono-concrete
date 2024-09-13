@@ -105,7 +105,7 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
     collision::ChCollisionModel::SetDefaultSuggestedEnvelope(0.004);
 
     double gap_between_sphere_1_2 = 0.000;
-    double h = 3e-3;
+    double h = 4e-3;
 
     // Define balls
     double radius = 0.005;                                          // in meters, I have doubt about used units
@@ -124,7 +124,7 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
             ball->SetWvel_par(chrono::ChVector<>(0, 0, 0));
         } else {
             //ball->SetPos(chrono::ChVector<>(-i *( 2 * radius - h ) + gap_between_sphere_1_2, 0, 0));
-            ball->SetPos(chrono::ChVector<>(-2 * radius + 0.003, 0, 0));
+            ball->SetPos(chrono::ChVector<>(-2 * radius - 0.007, 0, 0));
             ball->SetPos_dt(chrono::ChVector<>(0, 0, 0));
             ball->SetRot(QUNIT);
         }
@@ -184,12 +184,12 @@ int main(int argc, char* argv[]) {
     // Set DFC contact model parameters
     sys.GetSettings()->dfc_contact_param.E_Nm = 0.04e6;  /// Mortar to mortar and mortar to aggregate stiffness
     sys.GetSettings()->dfc_contact_param.E_Na = 100e6;   /// Aggregate to aggregate stiffness
-    sys.GetSettings()->dfc_contact_param.h = 3e-3;       /// Thickness of mortar layer around an aggregate
+    sys.GetSettings()->dfc_contact_param.h = 4e-3;       /// Thickness of mortar layer around an aggregate
     sys.GetSettings()->dfc_contact_param.alfa_a = 0.25;  /// Normal-shear coupling parameter inside concrete
     sys.GetSettings()->dfc_contact_param.beta = 0.5;     /// Parameter governing viscous behaviour in normal direction
-    sys.GetSettings()->dfc_contact_param.sigma_t = 0.009e6;  /// Tensile strength of mortar
-    sys.GetSettings()->dfc_contact_param.sigma_tau0 = 250;   /// Mortar shear yield stress
-    sys.GetSettings()->dfc_contact_param.eta_inf = 10;       /// Mortar plastic viscosity
+    sys.GetSettings()->dfc_contact_param.sigma_t = 0.005e6;  /// Tensile strength of mortar
+    sys.GetSettings()->dfc_contact_param.sigma_tau0 = 0.0005e6;   /// Mortar shear yield stress
+    sys.GetSettings()->dfc_contact_param.eta_inf = 50;       /// Mortar plastic viscosity
     sys.GetSettings()->dfc_contact_param.kappa_0 = 100;      /// Peanalty constant
     sys.GetSettings()->dfc_contact_param.n = 1;              /// Constant defining flow (n = 1 -> Newtonian, n > 1 ->
                                                  /// shear-thickening, n < 1 shear-thinning)
@@ -197,18 +197,18 @@ int main(int argc, char* argv[]) {
     sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.04e6;  /// Mortar to surface stiffness
     sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;   /// Mortar to aggregate stiffness
     sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;  /// Normal-shear coupling parameter for concrete interaction with surface
-    sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.0024e6;  /// Tensile strength of mortar interacting with surface
-    sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 250;    /// Mortar shear yield stress interacting with surface
-    sys.GetSettings()->dfc_contact_param.eta_inf_s = 10;        /// Mortar plastic viscosity interacting with surface
+    sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.005e6;  /// Tensile strength of mortar interacting with surface
+    sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 0.0005e6;    /// Mortar shear yield stress interacting with surface
+    sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;        /// Mortar plastic viscosity interacting with surface
     sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;          /// Aggregate to surface friction coefficient
-    sys.GetSettings()->dfc_contact_param.t = 2.5e-3;            /// thickness of mortar layer on surfaces
+    sys.GetSettings()->dfc_contact_param.t = 2e-3;            /// thickness of mortar layer on surfaces
 
     // The following two lines are optional, since they are the default options. They are added for future reference,
     // i.e. when needed to change those models.
     sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
 
     int ball_quantity = 2;
-    auto created_balls = AddBalls(sys, ball_quantity, -0.007);
+    auto created_balls = AddBalls(sys, ball_quantity, 0);
     created_balls[1]->SetBodyFixed(true);
 
     std::shared_ptr<ChVisualSystem> vis;
@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
         created_balls[0]->SetRot(rot_pos_as_quaternion);
         created_balls[0]->SetWvel_par(chrono::ChVector<>(0, 0, 70));
         */
-        
+	/*        
         if (simulation_time <= 0.5) {
             created_balls[0]->SetPos(chrono::ChVector<>(-0.007 * simulation_time, 0, 0));  // keep the velocity as constant
             created_balls[0]->SetPos_dt(chrono::ChVector<>(-0.007, 0, 0)); 
@@ -274,6 +274,7 @@ int main(int argc, char* argv[]) {
             created_balls[0]->SetRot(QUNIT);
             created_balls[0]->SetRot_dt(QUNIT);
         }
+	*/
         /*
         if (simulation_time > 1) {
             created_balls[0]->SetPos(chrono::ChVector<>(-0.008 * 0.5 + 0.014 * (0.5) - 0.014 * (simulation_time - 1), 0,
