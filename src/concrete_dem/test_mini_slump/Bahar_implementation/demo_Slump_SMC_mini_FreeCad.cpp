@@ -208,8 +208,7 @@ double calculateKE(ChSystem& sys){
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::shared_ptr<ChBody> AddConicalContainer(ChSystem& sys, std::shared_ptr<ChMaterialSurface> mat, double density, double radius, double height, std::string current_dir) {
-    // create cylinder 
-   
+    // create cylinder
 	auto cylinder = chrono_types::make_shared<ChBodyEasyMesh>(
         //(current_dir+"/coni_100_50_300.obj").c_str(),  // file name for OBJ Wavefront mesh   
         (current_dir+"/minislump-Cut4.obj").c_str(),  // file name for OBJ Wavefront mesh   **mini_slump2-Cut**
@@ -237,7 +236,6 @@ std::shared_ptr<ChBody> AddConicalContainer(ChSystem& sys, std::shared_ptr<ChMat
 
 std::shared_ptr<ChBody> AddConicalContainer2(ChSystem& sys, std::shared_ptr<ChMaterialSurface> mat, double density, double radius, double height, std::string current_dir) {
     // create cylinder 
-   
 	auto cylinder = chrono_types::make_shared<ChBodyEasyMesh>(
         (current_dir+"/minislump-Cut4.obj").c_str(),  // file name for OBJ Wavefront mesh
         density,                                         // density of the body
@@ -490,7 +488,7 @@ int main(int argc, char* argv[]) {
 	//
     std::string current_dir(argv[0]);
     int pos = current_dir.find_last_of("/\\");
-    current_dir=current_dir.substr(0, pos-5); 
+    current_dir=current_dir.substr(0, pos);
 	//
     // Create a Chrono physical system
     ChSystemSMC sys;
@@ -502,7 +500,8 @@ int main(int argc, char* argv[]) {
     vis->SetWindowTitle("Particle emitter processor  MINI");
     vis->Initialize();
     vis->AddLogo();
-    vis->AddSkyBox("/chrono-concrete/data/skybox/");
+    //    vis->AddSkyBox("/chrono-concrete/data/skybox/");
+    vis->AddSkyBox();
     vis->AddLight(ChVector<>(200,200,-250), 20, ChColor(255,255,255));
     //vis->AddTypicalLights();
     vis->AddCamera(ChVector<>(200, 200, -300));
@@ -600,7 +599,7 @@ int main(int argc, char* argv[]) {
 	// Read and load predefined particle list
 	//
 	std::string data_path=current_dir;
-	std::string file_name="DFCgeo000-data-particles-mini-2x4-dist"; //"slump_scc_particle";	
+	std::string file_name="/DFCgeo000-data-particles-mini-2x4-dist"; //"slump_scc_particle"	
 	// DFCgeo000-data-particles-mini-2x4-dist.dat   yada DFCgeo000-data-particles-mini-2-dist
 	//AddFallingItems(sys, vis, data_path, file_name, rho, mortar_layer);
 	ReadDFCparticles(sys, vis, data_path, file_name, rho, mortar_layer);
@@ -747,7 +746,7 @@ int main(int argc, char* argv[]) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////	
     // Bind all existing visual shapes to the visualization system
-    //vis->AttachSystem(&sys);
+    vis->AttachSystem(&sys);
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Modify some setting of the physical system for the simulation, if you want
@@ -843,11 +842,10 @@ int main(int argc, char* argv[]) {
 	int kk=0;
 
 	timestep = 1.0e-8;
-    while (  sys.GetChTime()<t1+0.50) {
-		//vis->Run() & 
-		//vis->BeginScene(true, true, ChColor(185./255,202./255,222./255));
-		//vis->Render();  
-		//vis->EndScene();
+	while (sys.GetChTime()<t1+0.50) {
+	  //		vis->BeginScene(true, true, ChColor(185./255,202./255,222./255));
+	  //	vis->Render();  
+	  //	vis->EndScene();
 		//		
         // Continuosly create particle flow:
         //emitter.EmitParticles(sys, timestep);
