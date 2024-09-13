@@ -62,8 +62,8 @@ project(demo_fcm)
 
 LIST(APPEND CMAKE_PREFIX_PATH "/chrono-concrete/build/lib")
 find_package(Chrono
-             COMPONENTS Irrlicht Multicore Distributed Gpu Fsi
-             OPTIONAL_COMPONENTS PardisoMKL
+             COMPONENTS Irrlicht Multicore
+             OPTIONAL_COMPONENTS PardisoMKL Distributed Gpu Fsi
              CONFIG)
 
 #--------------------------------------------------------------
