@@ -340,9 +340,9 @@ void ReadDFCparticles(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vi
 		vis->BindItem(body);	
 		sys.AddBody(body);
 		
-		body->SetLimitSpeed(true);
-		body->SetMaxSpeed(1000.);
-		body->SetMaxWvel(1000.);
+		body->SetLimitSpeed(false);
+		//	body->SetMaxSpeed(1000.);
+		//body->SetMaxWvel(1000.);
 		//body->SetBodyFixed(true);
 		//sys.AddBatch(body);
     
@@ -577,10 +577,10 @@ int main(int argc, char* argv[]) {
 	float alpha=0.25;
 	float beta=0.5;
 	float np=1.0;
-	float sgmTmax=5.0E-4;  ///3rd param 0.25 / 0.50 / 1 / 2 / 4 
-	float sgmTau0=2.0E-5;  ///4th param 0.25 / 0.50 / 1 / 2 / 4  
+	float sgmTmax=3.0E-4;  ///3rd param 0.25 / 0.50 / 1 / 2 / 4 
+	float sgmTau0=3.0E-5;  ///4th param 0.25 / 0.50 / 1 / 2 / 4  
 	float kappa0=100.;
-	float eta_inf=2.0E-5;/// 5th param 0.25 / 0.50 / 1 / 2 / 4 
+	float eta_inf=1.5E-5;/// 5th param 0.25 / 0.50 / 1 / 2 / 4 
 	//
 	//
     //
