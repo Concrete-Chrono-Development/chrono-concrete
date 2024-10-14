@@ -1290,6 +1290,19 @@ source_group(utils FILES
     ${ChronoEngine_utils_SOURCES}
     ${ChronoEngine_utils_HEADERS})
 
+
+set(ChronoEngine_fresh_concrete_SOURCES
+    fresh_concrete/FreshConcreteContact.cpp   
+)    
+
+set(ChronoEngine_fresh_concrete_HEADERS
+       
+)    
+
+source_group(fresh_concrete FILES
+    ${ChronoEngine_fresh_concrete_SOURCES}
+    ${ChronoEngine_fresh_concrete_HEADERS})
+
 # TinyObj Group
 
 set(ChronoEngine_tiny_obj_FILES
@@ -1365,6 +1378,8 @@ set(ChronoEngine_FILES
     ${ChronoEngine_utils_HEADERS}
     ${ChronoEngine_tiny_obj_FILES}
     ${ChronoEngine_libstl_FILES}
+    ${ChronoEngine_fresh_concrete_SOURCES}
+    ${ChronoEngine_fresh_concrete_HEADERS}
 )
 
 # Add the 'socket' library to the linking, depending on platform.

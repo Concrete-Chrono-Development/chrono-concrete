@@ -5,7 +5,7 @@
 
 # Known NVIDIA GPU achitectures Chrono can be compiled for.
 # This list will be used for CUDA_ARCH_NAME = All option
-SET(KNOWN_GPU_ARCHITECTURES "5.2 5.3 6.0 6.1 6.2 7.0 7.2 7.5 8.0 8.6 8.9")
+SET(KNOWN_GPU_ARCHITECTURES "5.2 5.3 6.0 6.1 6.2 7.0 7.2 7.5 8.0 8.6")
 
 ################################################################################################
 # Removes duplicates from LIST(s)
