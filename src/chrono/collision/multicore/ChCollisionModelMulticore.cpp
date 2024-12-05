@@ -48,16 +48,16 @@ ChCollisionModelMulticore::~ChCollisionModelMulticore() {
 }
 
 void ChCollisionModelMulticore::Populate() {
-    for (const auto& shape_instance : model->GetShapes()) {
+    for (const auto& shape_instance : model->GetShapeInstances()) {
         const auto& shape = shape_instance.first;
         const auto& material = shape->GetMaterial();
 
         // Create collision shapes relative to the body COG frame
         auto frame = shape_instance.second;
         if (ChBodyAuxRef* body_ar = dynamic_cast<ChBodyAuxRef*>(GetBody())) {
-            frame = frame >> body_ar->GetFrame_REF_to_COG();
+            frame = frame >> body_ar->GetFrameRefToCOM();
         }
-        const ChVector<>& position = frame.GetPos();
+        const ChVector3d& position = frame.GetPos();
         const ChQuaternion<>& rotation = frame.GetRot();
 
         switch (shape->GetType()) {
@@ -213,15 +213,17 @@ void ChCollisionModelMulticore::Populate() {
             }
             case ChCollisionShape::Type::TRIANGLE: {
                 auto shape_tri = std::static_pointer_cast<ChCollisionShapeTriangle>(shape);
-                const auto& p1 = shape_tri->GetGeometry().p1;
-                const auto& p2 = shape_tri->GetGeometry().p1;
-                const auto& p3 = shape_tri->GetGeometry().p1;
+
+                ChTriangle tri = shape_tri->GetGeometry();
+                ChVector3d p1 = position + rotation.Rotate(tri.p1);
+                ChVector3d p2 = position + rotation.Rotate(tri.p2);
+                ChVector3d p3 = position + rotation.Rotate(tri.p3);
 
                 auto ct_shape = chrono_types::make_shared<ctCollisionShape>();
-                ct_shape->A = real3(p1.x() + position.x(), p1.y() + position.y(), p1.z() + position.z());
-                ct_shape->B = real3(p2.x() + position.x(), p2.y() + position.y(), p2.z() + position.z());
-                ct_shape->C = real3(p3.x() + position.x(), p3.y() + position.y(), p3.z() + position.z());
-                ct_shape->R = quaternion(rotation.e0(), rotation.e1(), rotation.e2(), rotation.e3());
+                ct_shape->A = FromChVector(p1);
+                ct_shape->B = FromChVector(p2);
+                ct_shape->C = FromChVector(p3);
+                ct_shape->R = quaternion(1, 0, 0, 0);
 
                 m_shapes.push_back(shape);
                 m_ct_shapes.push_back(ct_shape);
@@ -231,17 +233,19 @@ void ChCollisionModelMulticore::Populate() {
                 auto shape_trimesh = std::static_pointer_cast<ChCollisionShapeTriangleMesh>(shape);
                 auto trimesh = shape_trimesh->GetMesh();
 
-                for (int i = 0; i < trimesh->getNumTriangles(); i++) {
-                    geometry::ChTriangle tri = trimesh->getTriangle(i);
-                    ChVector<> p1 = tri.p1 + position;
-                    ChVector<> p2 = tri.p2 + position;
-                    ChVector<> p3 = tri.p3 + position;
+                for (unsigned int i = 0; i < trimesh->GetNumTriangles(); i++) {
+                    ChTriangle tri = trimesh->GetTriangle(i);
+                    ChVector3d p1 = position + rotation.Rotate(tri.p1);
+                    ChVector3d p2 = position + rotation.Rotate(tri.p2);
+                    ChVector3d p3 = position + rotation.Rotate(tri.p3);
                     auto shape_triangle = chrono_types::make_shared<ChCollisionShapeTriangle>(material, p1, p2, p3);
+
                     auto ct_shape = chrono_types::make_shared<ctCollisionShape>();
-                    ct_shape->A = real3(p1.x(), p1.y(), p1.z());
-                    ct_shape->B = real3(p2.x(), p2.y(), p2.z());
-                    ct_shape->C = real3(p3.x(), p3.y(), p3.z());
-                    ct_shape->R = quaternion(rotation.e0(), rotation.e1(), rotation.e2(), rotation.e3());
+                    ct_shape->A = FromChVector(p1);
+                    ct_shape->B = FromChVector(p2);
+                    ct_shape->C = FromChVector(p3);
+                    ct_shape->R = quaternion(1, 0, 0, 0);
+
                     m_shapes.push_back(shape_triangle);
                     m_ct_shapes.push_back(ct_shape);
                 }
@@ -262,15 +266,15 @@ void ChCollisionModelMulticore::Populate() {
 // with respect to a body's reference frame, into a frame defined with respect
 // to the body's centroidal frame.  Note that by default, a body's reference
 // frame is the centroidal frame. This is not true for a ChBodyAuxRef.
-void TransformToCOG(ChBody* body, const ChVector<>& pos, const ChMatrix33<>& rot, ChFrame<>& frame) {
+void TransformToCOG(ChBody* body, const ChVector3d& pos, const ChMatrix33<>& rot, ChFrame<>& frame) {
     frame = ChFrame<>(pos, rot);
     if (ChBodyAuxRef* body_ar = dynamic_cast<ChBodyAuxRef*>(body)) {
-        frame = frame >> body_ar->GetFrame_REF_to_COG();
+        frame = frame >> body_ar->GetFrameRefToCOM();
     }
 }
 
-geometry::ChAABB ChCollisionModelMulticore::GetBoundingBox() const {
-    return geometry::ChAABB(aabb_min, aabb_max);
+ChAABB ChCollisionModelMulticore::GetBoundingBox() const {
+    return ChAABB(aabb_min, aabb_max);
 }
 
 void ChCollisionModelMulticore::SyncPosition() {

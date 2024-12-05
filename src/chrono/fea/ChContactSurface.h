@@ -21,8 +21,8 @@
 
 #include "chrono/fea/ChElementBase.h"
 #include "chrono/physics/ChContactable.h"
-#include "chrono/physics/ChMaterialSurfaceSMC.h"
-#include "chrono/physics/ChMaterialSurfaceNSC.h"
+#include "chrono/physics/ChContactMaterialSMC.h"
+#include "chrono/physics/ChContactMaterialNSC.h"
 #include "chrono/collision/ChCollisionSystem.h"
 
 namespace chrono {
@@ -35,7 +35,7 @@ namespace fea {
 /// Actual collision geometry is provided by derived classes (ChContactSurfaceNodeCloud or ChContactSurfaceMesh).
 class ChApi ChContactSurface {
   public:
-    ChContactSurface(std::shared_ptr<ChMaterialSurface> material, ChPhysicsItem* mesh = nullptr);
+    ChContactSurface(std::shared_ptr<ChContactMaterial> material, ChPhysicsItem* mesh = nullptr);
 
     virtual ~ChContactSurface() {}
 
@@ -45,8 +45,14 @@ class ChApi ChContactSurface {
     /// Set the owner physics item (e.g., an FEA mesh).
     void SetPhysicsItem(ChPhysicsItem* physics_item) { m_physics_item = physics_item; }
 
-    /// Get the surface contact material
-    std::shared_ptr<ChMaterialSurface>& GetMaterialSurface() { return m_material; }
+    /// Disable self-collisions (default: enabled).
+    /// Calling this function results in all associated collision models being placed in the same collision family and
+    /// disabling collisions within that family.
+    /// Note: this function must be called *before* adding collision shapes to this contact surface. 
+    void DisableSelfCollisions(int family);
+
+    /// Get the surface contact material.
+    std::shared_ptr<ChContactMaterial>& GetMaterialSurface() { return m_material; }
 
     // Functions to interface this with ChPhysicsItem container
     virtual void SyncCollisionModels() const = 0;
@@ -54,8 +60,10 @@ class ChApi ChContactSurface {
     virtual void RemoveCollisionModelsFromSystem(ChCollisionSystem* coll_sys) const = 0;
 
   protected:
-    std::shared_ptr<ChMaterialSurface> m_material;  ///< contact material properties
+    std::shared_ptr<ChContactMaterial> m_material;  ///< contact material properties
     ChPhysicsItem* m_physics_item;                  ///< associated physics item (e.g., an FEA mesh)
+    bool m_self_collide;                            ///< include self-collisions?
+    int m_collision_family;                         ///< collision family (if no self-collisions)
 };
 
 /// @} fea_contact

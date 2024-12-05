@@ -32,6 +32,7 @@ LMTV::LMTV()
     : m_system(nullptr),
       m_vehicle(nullptr),
       m_contactMethod(ChContactMethod::NSC),
+      m_collsysType(ChCollisionSystem::Type::BULLET),
       m_chassisCollisionType(CollisionType::NONE),
       m_fixed(false),
       m_brake_locking(false),
@@ -42,7 +43,7 @@ LMTV::LMTV()
       m_tire_step_size(-1),
       m_steeringType(SteeringTypeWV::PITMAN_ARM),
       m_initFwdVel(0),
-      m_initPos(ChCoordsys<>(ChVector<>(0, 0, 1), QUNIT)),
+      m_initPos(ChCoordsys<>(ChVector3d(0, 0, 1), QUNIT)),
       m_initOmega({0, 0, 0, 0}),
       m_apply_drag(false) {}
 
@@ -50,6 +51,7 @@ LMTV::LMTV(ChSystem* system)
     : m_system(system),
       m_vehicle(nullptr),
       m_contactMethod(ChContactMethod::NSC),
+      m_collsysType(ChCollisionSystem::Type::BULLET),
       m_chassisCollisionType(CollisionType::NONE),
       m_fixed(false),
       m_brake_locking(false),
@@ -60,7 +62,7 @@ LMTV::LMTV(ChSystem* system)
       m_tire_step_size(-1),
       m_steeringType(SteeringTypeWV::PITMAN_ARM),
       m_initFwdVel(0),
-      m_initPos(ChCoordsys<>(ChVector<>(0, 0, 1), QUNIT)),
+      m_initPos(ChCoordsys<>(ChVector3d(0, 0, 1), QUNIT)),
       m_initOmega({0, 0, 0, 0}),
       m_apply_drag(false) {}
 
@@ -83,7 +85,7 @@ void LMTV::Initialize() {
     m_vehicle = m_system
                     ? new LMTV_Vehicle(m_system, m_fixed, m_brake_type, m_steeringType, m_chassisCollisionType)
                     : new LMTV_Vehicle(m_fixed, m_brake_type, m_steeringType, m_contactMethod, m_chassisCollisionType);
-
+    m_vehicle->SetCollisionSystemType(m_collsysType);
     m_vehicle->SetInitWheelAngVel(m_initOmega);
     m_vehicle->Initialize(m_initPos, m_initFwdVel);
 
@@ -107,6 +109,7 @@ void LMTV::Initialize() {
             transmission = chrono_types::make_shared<FMTV_AutomaticTransmissionSimple>("Transmission");
             break;
     }
+
     if (!transmission) {
         switch (m_transmissionType) {
             case TransmissionModelType::AUTOMATIC_SHAFTS:
@@ -114,6 +117,8 @@ void LMTV::Initialize() {
                 break;
             case TransmissionModelType::AUTOMATIC_SIMPLE_MAP:
                 transmission = chrono_types::make_shared<FMTV_AutomaticTransmissionSimpleMap>("Transmission");
+                break;
+            default:
                 break;
         }
     }

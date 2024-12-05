@@ -61,6 +61,7 @@ class CH_MODELS_API HMMWV {
     void SetTireType(TireModelType val) { m_tireType = val; }
 
     void SetTireCollisionType(ChTire::CollisionType collision_type) { m_tire_collision_type = collision_type; }
+    void SetTireContactSurfaceType(ChTire::ContactSurfaceType surface_type, double surface_dim = 0.01);
 
     void SetInitPosition(const ChCoordsys<>& pos) { m_initPos = pos; }
     void SetInitFwdVel(double fwdVel) { m_initFwdVel = fwdVel; }
@@ -112,6 +113,8 @@ class CH_MODELS_API HMMWV {
     BrakeType m_brake_type;
     TireModelType m_tireType;
     ChTire::CollisionType m_tire_collision_type;
+    ChTire::ContactSurfaceType m_tire_surface_type;
+    double m_tire_surface_dim;
 
     double m_tire_step_size;
 
@@ -152,8 +155,8 @@ class CH_MODELS_API HMMWV_Full : public HMMWV {
   private:
     virtual HMMWV_Vehicle* CreateVehicle() override;
 
-    bool m_use_tierod_bodies;       ///< tierod bodies + joints (true) or distance constraints (false)
-    bool m_rigidColumn;             ///< only used with PITMAN_ARM_SHAFT
+    bool m_use_tierod_bodies;  ///< tierod bodies + joints (true) or distance constraints (false)
+    bool m_rigidColumn;        ///< only used with PITMAN_ARM_SHAFT
 };
 
 /// Definition of a HMMWV vehicle assembly (vehicle, powertrain, and tires), using reduced

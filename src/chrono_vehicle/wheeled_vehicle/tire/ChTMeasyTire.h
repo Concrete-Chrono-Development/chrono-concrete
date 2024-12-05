@@ -58,6 +58,7 @@
 namespace chrono {
 namespace vehicle {
 
+/// TMeasy handling tire model.
 class CH_VEHICLE_API ChTMeasyTire : public ChForceElementTire {
   public:
     ChTMeasyTire(const std::string& name);
@@ -69,9 +70,6 @@ class CH_VEHICLE_API ChTMeasyTire : public ChForceElementTire {
 
     /// Get the tire radius.
     virtual double GetRadius() const override { return m_states.R_eff; }
-
-    /// Set the limit for camber angle (in degrees).  Default: 3 degrees.
-    void SetGammaLimit(double gamma_limit) { m_gamma_limit = gamma_limit; }
 
     /// Get the width of the tire.
     virtual double GetWidth() const override { return m_width; }
@@ -144,10 +142,10 @@ class CH_VEHICLE_API ChTMeasyTire : public ChForceElementTire {
     void SetVerticalStiffness(std::vector<double>& defl, std::vector<double>& frc);
 
     /// Set the tire reference coefficient of friction.
-    void SetFrictionCoefficient(double coeff);
+    void SetFrictionCoefficient(double coef) { m_par.mu_0 = coef; }
 
     /// Set rolling resistance coefficients (default: 0.01).
-    void SetRollingResistanceCoefficient(double rr_coeff);
+    void SetRollingResistanceCoefficient(double coef) { m_rolling_resistance = coef; }
 
     /// Generate basic tire plots.
     /// This function creates a Gnuplot script file with the specified name.
@@ -176,8 +174,6 @@ class CH_VEHICLE_API ChTMeasyTire : public ChForceElementTire {
     double m_end_start_transition;
 
     double m_vnum;
-
-    double m_gamma_limit;  ///< limit camber angle (degrees!)
 
     // TMsimple tire model parameters
     double m_unloaded_radius;     ///< reference tire radius
@@ -274,7 +270,7 @@ class CH_VEHICLE_API ChTMeasyTire : public ChForceElementTire {
         double sqe;              // Zero after complete sliding at actual load level
         double brx{0};           // bristle deformation x
         double bry{0};           // bristle deformation y
-        ChVector<> disc_normal;  // (temporary for debug)
+        ChVector3d disc_normal;  // (temporary for debug)
     };
 
     TireStates m_states;

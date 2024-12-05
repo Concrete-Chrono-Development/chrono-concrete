@@ -16,6 +16,72 @@ set(CVM_COMMON_FILES
 )
 source_group("" FILES ${CVM_COMMON_FILES})
 
+set(CVM_JEEP_FILES
+        jeep/Cherokee_Chassis.cpp
+        jeep/Cherokee_Chassis.h
+        jeep/Cherokee_Wheel.cpp
+        jeep/Cherokee_Wheel.h
+        jeep/Cherokee_TMeasyTire.cpp
+        jeep/Cherokee_TMeasyTire.h
+        jeep/Cherokee_Driveline4WD.cpp
+        jeep/Cherokee_Driveline4WD.h
+        jeep/Cherokee_AutomaticTransmissionStafts.cpp
+        jeep/Cherokee_AutomaticTransmissionStafts.h
+        jeep/Cherokee_BrakeShafts.cpp
+        jeep/Cherokee_BrakeShafts.h
+        jeep/Cherokee_EngineShafts.cpp
+        jeep/Cherokee_EngineShafts.h
+        jeep/Cherokee_SolidAxleRear.cpp
+        jeep/Cherokee_SolidAxleRear.h
+        jeep/Cherokee_SolidAxleFront.cpp
+        jeep/Cherokee_SolidAxleFront.h
+        jeep/Cherokee_Steering.cpp
+        jeep/Cherokee_Steering.h
+        jeep/Cherokee_Vehicle.cpp
+        jeep/Cherokee_Vehicle.h
+        jeep/Cherokee.cpp
+        jeep/Cherokee.h
+        jeep/Cherokee_RigidTire.cpp
+        jeep/Cherokee_RigidTire.h
+)
+source_group("jeep" FILES ${CVM_JEEP_FILES})
+
+set(CVM_BMW_FILES
+    bmw/BMW_E90_AutomaticTransmissionSimpleMap.cpp
+    bmw/BMW_E90_AutomaticTransmissionSimpleMap.h
+    bmw/BMW_E90_AntiRollBarFront.cpp
+    bmw/BMW_E90_AntiRollBarFront.h
+    bmw/BMW_E90_AntiRollBarRear.cpp
+    bmw/BMW_E90_AntiRollBarRear.h
+    bmw/BMW_E90.cpp
+    bmw/BMW_E90.h
+    bmw/BMW_E90_Vehicle.cpp
+    bmw/BMW_E90_Vehicle.h
+    bmw/BMW_E90_BrakeShafts.cpp
+    bmw/BMW_E90_BrakeShafts.h
+    bmw/BMW_E90_Chassis.cpp
+    bmw/BMW_E90_Chassis.h
+    bmw/BMW_E90_DoubleWishbone.cpp
+    bmw/BMW_E90_DoubleWishbone.h
+    bmw/BMW_E90_Driveline.cpp
+    bmw/BMW_E90_Driveline.h
+    bmw/BMW_E90_EngineSimpleMap.cpp
+    bmw/BMW_E90_EngineSimpleMap.h
+    bmw/BMW_E90_FrontWheel.cpp
+    bmw/BMW_E90_FrontWheel.h
+    bmw/BMW_E90_MacPhersonStrut.cpp
+    bmw/BMW_E90_MacPhersonStrut.h
+    bmw/BMW_E90_RearWheel.cpp
+    bmw/BMW_E90_RearWheel.h
+    bmw/BMW_E90_Steering.cpp
+    bmw/BMW_E90_Steering.h
+    bmw/BMW_E90_TMsimpleTireFront.cpp
+    bmw/BMW_E90_TMsimpleTireFront.h
+    bmw/BMW_E90_TMsimpleTireRear.cpp
+    bmw/BMW_E90_TMsimpleTireRear.h
+)
+source_group("bmw" FILES ${CVM_BMW_FILES})
+
 set(CVM_GCLASS_FILES
     gclass/G500_AutomaticTransmissionSimpleMap.cpp
     gclass/G500_AutomaticTransmissionSimpleMap.h
@@ -849,6 +915,8 @@ source_group("m113/driveline" FILES ${CVM_M113_DRIVELINE_FILES})
 source_group("m113/powertrain" FILES ${CVM_M113_POWERTRAIN_FILES})
 
 set(CVM_ARTCAR_FILES
+    artcar/ARTcar_BrakeShafts.cpp
+    artcar/ARTcar_BrakeShafts.h
     artcar/ARTcar_BrakeSimple.cpp
     artcar/ARTcar_BrakeSimple.h
     artcar/ARTcar_Chassis.cpp
@@ -925,6 +993,8 @@ set(LIBRARIES ChronoEngine ChronoEngine_vehicle)
 
 add_library(ChronoModels_vehicle
     ${CVM_COMMON_FILES}
+    ${CVM_JEEP_FILES}     
+    ${CVM_BMW_FILES}     
     ${CVM_GCLASS_FILES}     
     ${CVM_HMMWV_FILES}
     ${CVM_FEDA_FILES}

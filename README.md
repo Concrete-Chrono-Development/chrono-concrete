@@ -213,7 +213,15 @@ Install Microsoft Visual Studio 2022. The [community edition of the latest Visua
 
 <details>
 
-<summary>Step 2: Install Eigen Library</summary>
+- C++ API reference
+  - [Main development branch](http://api.projectchrono.org/)
+  - [Release 9.0.0](http://api.projectchrono.org/9.0.0/)
+  - [Release 8.0.0](http://api.projectchrono.org/8.0.0/)
+- Python interface
+  - [PyChrono](https://api.projectchrono.org/pychrono_introduction.html)
+- Reference manuals
+  - [Core module](https://api.projectchrono.org/manual_root.html)
+  - [Chrono::Vehicle module](https://api.projectchrono.org/manual_vehicle.html)
 
 Download the Eigen version 3.4.0 zipped  source code. This [code is available for free](https://gitlab.com/libeigen/eigen/-/releases/3.4.0).&#x20;
 

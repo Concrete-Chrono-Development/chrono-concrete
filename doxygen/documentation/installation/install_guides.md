@@ -9,8 +9,6 @@ Additional Chrono functionalities are provided through optional _modules_, condi
 
 -   [CASCADE module](@ref module_cascade_installation)
 
--   [COSIMULATION module](@ref module_cosimulation_installation)
-
 -   [CSHARP module](@ref module_csharp_installation)
 
 -   [FMI module](@ref module_fmi_installation)
@@ -32,8 +30,6 @@ Additional Chrono functionalities are provided through optional _modules_, condi
 -   [OPENGL module](@ref module_opengl_installation)
 
 -   [Pardiso MKL module](@ref module_mkl_installation)
-
--   [Pardiso Project module](@ref module_pardisoproject_installation)
 
 -   [PARSERS module](@ref module_parsers_installation)
 
@@ -77,6 +73,6 @@ Full instructions can be found in: [Linking to Chrono](@ref tutorial_install_pro
 
 ### Chrono::Solidworks add-in
 
-An add-in to enable the export of models from SolidWorks to Chrono
+An add-in to simulate Solidworks models using the Chrono library
 
-- @subpage tutorial_install_chrono_solidworks
+- @subpage chrono_solidworks_installation

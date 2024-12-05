@@ -32,6 +32,7 @@
 #include <cmath>
 
 #include "chrono/core/ChGlobal.h"
+#include "chrono/functions/ChFunctionSineStep.h"
 
 #include "chrono_vehicle/wheeled_vehicle/tire/ChPac89Tire.h"
 
@@ -39,10 +40,10 @@ namespace chrono {
 namespace vehicle {
 
 ChPac89Tire::ChPac89Tire(const std::string& name)
-    : ChForceElementTire(name), m_kappa(0), m_alpha(0), m_gamma(0), m_gamma_limit(3), m_mu(0), m_mu0(0.8) {
-    m_tireforce.force = ChVector<>(0, 0, 0);
-    m_tireforce.point = ChVector<>(0, 0, 0);
-    m_tireforce.moment = ChVector<>(0, 0, 0);
+    : ChForceElementTire(name), m_gamma(0), m_gamma_limit(3.0 * CH_DEG_TO_RAD), m_mu(0), m_mu0(0.8) {
+    m_tireforce.force = ChVector3d(0, 0, 0);
+    m_tireforce.point = ChVector3d(0, 0, 0);
+    m_tireforce.moment = ChVector3d(0, 0, 0);
 }
 
 // -----------------------------------------------------------------------------
@@ -66,7 +67,7 @@ void ChPac89Tire::Synchronize(double time, const ChTerrain& terrain) {
 
     // Extract the wheel normal (expressed in global frame)
     ChMatrix33<> A(wheel_state.rot);
-    ChVector<> disc_normal = A.Get_A_Yaxis();
+    ChVector3d disc_normal = A.GetAxisY();
 
     // Assuming the tire is a disc, check contact with terrain
     float mu;
@@ -80,7 +81,7 @@ void ChPac89Tire::Synchronize(double time, const ChTerrain& terrain) {
 
     if (m_data.in_contact) {
         // Wheel velocity in the ISO-C Frame
-        ChVector<> vel = wheel_state.lin_vel;
+        ChVector3d vel = wheel_state.lin_vel;
         m_data.vel = m_data.frame.TransformDirectionParentToLocal(vel);
 
         // Generate normal contact force (recall, all forces are reduced to the wheel
@@ -114,14 +115,14 @@ void ChPac89Tire::Synchronize(double time, const ChTerrain& terrain) {
         m_states.omega = 0;
         m_states.brx = 0;
         m_states.bry = 0;
-        m_states.disc_normal = ChVector<>(0, 0, 0);
+        m_states.disc_normal = ChVector3d(0, 0, 0);
     }
 }
 
 void ChPac89Tire::Advance(double step) {
     // Set tire forces to zero.
-    m_tireforce.force = ChVector<>(0, 0, 0);
-    m_tireforce.moment = ChVector<>(0, 0, 0);
+    m_tireforce.force = ChVector3d(0, 0, 0);
+    m_tireforce.moment = ChVector3d(0, 0, 0);
 
     // Return now if no contact.
     if (!m_data.in_contact)
@@ -141,11 +142,9 @@ void ChPac89Tire::Advance(double step) {
     ChClampValue(m_states.cp_long_slip, -1.0, 1.0);
 
     // Ensure that cp_side_slip stays between -pi()/2 & pi()/2 (a little less to prevent tan from going to infinity)
-    ChClampValue(m_states.cp_side_slip, -CH_C_PI_2 + 0.001, CH_C_PI_2 - 0.001);
+    ChClampValue(m_states.cp_side_slip, -CH_PI_2 + 0.001, CH_PI_2 - 0.001);
 
     double mu_scale = m_mu / m_mu0;
-
-    double frblend = ChSineStep(m_data.vel.x(), m_frblend_begin, 0.0, m_frblend_end, 1.0);
 
     // Calculate the new force and moment values (normal force and moment have already been accounted for in
     // Synchronize()).
@@ -160,14 +159,13 @@ void ChPac89Tire::Advance(double step) {
 
     CombinedCoulombForces(Fx0, Fy0, m_data.normal_force, mu_scale);
 
-    // Express alpha and gamma in degrees. Express kappa as percentage.
+    // Calculate alpha and gamma (in degrees) and kappa (percentage).
+    // Clamp |gamma| to specified value (limit due to tire testing, avoids erratic extrapolation)
     // Flip sign of alpha to convert to PAC89 modified SAE coordinates.
-    m_gamma = 90.0 - std::acos(m_states.disc_normal.z()) * CH_C_RAD_TO_DEG;
-    m_alpha = -m_states.cp_side_slip * CH_C_RAD_TO_DEG;
-    m_kappa = m_states.cp_long_slip * 100.0;
-
-    // Clamp |gamma| to specified value: Limit due to tire testing, avoids erratic extrapolation.
-    double gamma = ChClamp(m_gamma, -m_gamma_limit, m_gamma_limit);
+    m_gamma = ChClamp(CH_PI_2 - std::acos(m_states.disc_normal.z()), -m_gamma_limit, m_gamma_limit);
+    double gamma = m_gamma * CH_RAD_TO_DEG;
+    double alpha = -m_states.cp_side_slip * CH_RAD_TO_DEG;
+    double kappa = m_states.cp_long_slip * 100.0;
 
     // Longitudinal Force
     {
@@ -177,7 +175,7 @@ void ChPac89Tire::Advance(double step) {
         double B = BCD / (C * D);
         double Sh = m_PacCoeff.B9 * Fz + m_PacCoeff.B10;
         double Sv = 0.0;
-        double X1 = (m_kappa + Sh);
+        double X1 = (kappa + Sh);
         double E = (m_PacCoeff.B6 * std::pow(Fz, 2) + m_PacCoeff.B7 * Fz + m_PacCoeff.B8);
 
         Fx = mu_scale * (D * std::sin(C * std::atan(B * X1 - E * (B * X1 - std::atan(B * X1))))) + Sv;
@@ -192,7 +190,7 @@ void ChPac89Tire::Advance(double step) {
         double B = BCD / (C * D);
         double Sh = m_PacCoeff.A9 * Fz + m_PacCoeff.A10 + m_PacCoeff.A8 * gamma;
         double Sv = m_PacCoeff.A11 * Fz * gamma + m_PacCoeff.A12 * Fz + m_PacCoeff.A13;
-        double X1 = m_alpha + Sh;
+        double X1 = alpha + Sh;
         double E = m_PacCoeff.A6 * Fz + m_PacCoeff.A7;
 
         // Ensure that X1 stays within +/-90 deg minus a little bit
@@ -201,7 +199,10 @@ void ChPac89Tire::Advance(double step) {
         Fy = mu_scale * (D * std::sin(C * std::atan(B * X1 - E * (B * X1 - std::atan(B * X1))))) + Sv;
     }
 
-    // blend forces
+    // Blend forces
+    constexpr double frblend_begin = 1.0;
+    constexpr double frblend_end = 3.0;
+    double frblend = ChFunctionSineStep::Eval(m_data.vel.x(), frblend_begin, 0.0, frblend_end, 1.0);
     Fx = (1.0 - frblend) * Fx0 + frblend * Fx;
     Fy = (1.0 - frblend) * Fy0 + frblend * Fy;
 
@@ -215,7 +216,7 @@ void ChPac89Tire::Advance(double step) {
         double Sh = m_PacCoeff.C11 * gamma + m_PacCoeff.C12 * Fz + m_PacCoeff.C13;
         double Sv =
             (m_PacCoeff.C14 * std::pow(Fz, 2) + m_PacCoeff.C15 * Fz) * gamma + m_PacCoeff.C16 * Fz + m_PacCoeff.C17;
-        double X1 = m_alpha + Sh;
+        double X1 = alpha + Sh;
         double E = (m_PacCoeff.C7 * std::pow(Fz, 2) + m_PacCoeff.C8 * Fz + m_PacCoeff.C9) *
                    (1.0 - m_PacCoeff.C10 * std::abs(gamma));
 
@@ -240,32 +241,19 @@ void ChPac89Tire::Advance(double step) {
         const double vx_min = 0.125;
         const double vx_max = 0.5;
         // Smoothing factor dependend on m_state.abs_vx, allows soft switching of My
-        double myStartUp = ChSineStep(std::abs(m_states.vx), vx_min, 0.0, vx_max, 1.0);
+        double myStartUp = ChFunctionSineStep::Eval(std::abs(m_states.vx), vx_min, 0.0, vx_max, 1.0);
         My = myStartUp * m_rolling_resistance * m_data.normal_force * Lrad * ChSignum(m_states.omega);
     }
-
-    // GetLog() << "Fx:" << Fx
-    //    << " Fy:" << Fy
-    //    << " Fz:" << Fz
-    //    << " Mx:" << Mx
-    //    << " My:" << My
-    //    << " Mz:" << Mz
-    //    << std::endl
-    //    << " G:" << gamma
-    //    << " A:" << alpha
-    //    << " K:" << kappa
-    //    << " O:" << m_states.omega
-    //    << "\n";
 
     // Compile the force and moment vectors so that they can be
     // transformed into the global coordinate system.
     // Convert from SAE to ISO Coordinates at the contact patch.
-    m_tireforce.force = ChVector<>(Fx, -Fy, m_data.normal_force);
-    m_tireforce.moment = ChVector<>(Mx, -My, -Mz);
+    m_tireforce.force = ChVector3d(Fx, -Fy, m_data.normal_force);
+    m_tireforce.moment = ChVector3d(Mx, -My, -Mz);
 }
 
 void ChPac89Tire::CombinedCoulombForces(double& fx, double& fy, double fz, double muscale) {
-    ChVector2<> F;
+    ChVector2d F;
     /*
      The Dahl Friction Model elastic tread blocks representated by a single bristle. At tire stand still it acts
      like a spring which enables holding of a vehicle on a slope without creeping (hopefully). Damping terms

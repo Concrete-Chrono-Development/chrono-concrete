@@ -41,6 +41,7 @@ MAN_7t::MAN_7t()
     : m_system(nullptr),
       m_vehicle(nullptr),
       m_contactMethod(ChContactMethod::NSC),
+      m_collsysType(ChCollisionSystem::Type::BULLET),
       m_chassisCollisionType(CollisionType::NONE),
       m_fixed(false),
       m_use_6WD_drivetrain(false),
@@ -51,7 +52,7 @@ MAN_7t::MAN_7t()
       m_tireType(TireModelType::TMEASY),
       m_tire_step_size(-1),
       m_initFwdVel(0),
-      m_initPos(ChCoordsys<>(ChVector<>(0, 0, 1), QUNIT)),
+      m_initPos(ChCoordsys<>(ChVector3d(0, 0, 1), QUNIT)),
       m_initOmega({0, 0, 0, 0, 0, 0}),
       m_apply_drag(false) {}
 
@@ -59,6 +60,7 @@ MAN_7t::MAN_7t(ChSystem* system)
     : m_system(system),
       m_vehicle(nullptr),
       m_contactMethod(ChContactMethod::NSC),
+      m_collsysType(ChCollisionSystem::Type::BULLET),
       m_chassisCollisionType(CollisionType::NONE),
       m_fixed(false),
       m_use_6WD_drivetrain(false),
@@ -69,7 +71,7 @@ MAN_7t::MAN_7t(ChSystem* system)
       m_tireType(TireModelType::TMEASY),
       m_tire_step_size(-1),
       m_initFwdVel(0),
-      m_initPos(ChCoordsys<>(ChVector<>(0, 0, 1), QUNIT)),
+      m_initPos(ChCoordsys<>(ChVector3d(0, 0, 1), QUNIT)),
       m_initOmega({0, 0, 0, 0, 0, 0}),
       m_apply_drag(false) {}
 
@@ -93,7 +95,7 @@ void MAN_7t::Initialize() {
         m_system
             ? new MAN_7t_Vehicle(m_system, m_fixed, m_brake_type, m_chassisCollisionType, m_use_6WD_drivetrain)
             : new MAN_7t_Vehicle(m_fixed, m_brake_type, m_contactMethod, m_chassisCollisionType, m_use_6WD_drivetrain);
-
+    m_vehicle->SetCollisionSystemType(m_collsysType);
     m_vehicle->SetInitWheelAngVel(m_initOmega);
     m_vehicle->Initialize(m_initPos, m_initFwdVel);
 
@@ -108,7 +110,7 @@ void MAN_7t::Initialize() {
     switch (m_engineType) {
         case EngineModelType::SHAFTS:
             // engine = chrono_types::make_shared<MAN_7t_EngineShafts>("Engine");
-            GetLog() << "EngineModelType::SHAFTS not implemented for this model.\n";
+            std::cout << "EngineModelType::SHAFTS not implemented for this model.\n";
             break;
         case EngineModelType::SIMPLE_MAP:
             engine = chrono_types::make_shared<MAN_7t_EngineSimpleMap>("Engine");
@@ -122,10 +124,12 @@ void MAN_7t::Initialize() {
         switch (m_transmissionType) {
             case TransmissionModelType::AUTOMATIC_SHAFTS:
                 // transmission = chrono_types::make_shared<MAN_7t_AutomaticTransmissionShafts>("Transmission");
-                GetLog() << "TransmissionModelType::AUTOMATIC_SHAFTS not implemented for this model.\n";
+                std::cout << "TransmissionModelType::AUTOMATIC_SHAFTS not implemented for this model.\n";
                 break;
             case TransmissionModelType::AUTOMATIC_SIMPLE_MAP:
                 transmission = chrono_types::make_shared<MAN_7t_AutomaticTransmissionSimpleMap>("Transmission");
+                break;
+            default:
                 break;
         }
     }
