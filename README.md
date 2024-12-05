@@ -79,7 +79,7 @@ Copy the SIF file into your User Directory
 
 * In the SSH window run the following command, being sure to replace **LastnameFirstname** with your correct directory name
 
-<pre><code><strong>cp /projects/p31861/SingularityContainer/project-chrono-dependencies.sif /projects/p31861/Users/LastnameFirstname 
+<pre><code><strong>cp /projects/p31861/SingularityContainer/project-chrono-dependencies-with-intel-mkl.sif /projects/p31861/Users/LastnameFirstname 
 </strong></code></pre>
 
 </details>
@@ -213,7 +213,15 @@ Install Microsoft Visual Studio 2022. The [community edition of the latest Visua
 
 <details>
 
-<summary>Step 2: Install Eigen Library</summary>
+- C++ API reference
+  - [Main development branch](http://api.projectchrono.org/)
+  - [Release 9.0.0](http://api.projectchrono.org/9.0.0/)
+  - [Release 8.0.0](http://api.projectchrono.org/8.0.0/)
+- Python interface
+  - [PyChrono](https://api.projectchrono.org/pychrono_introduction.html)
+- Reference manuals
+  - [Core module](https://api.projectchrono.org/manual_root.html)
+  - [Chrono::Vehicle module](https://api.projectchrono.org/manual_vehicle.html)
 
 Download the Eigen version 3.4.0 zipped  source code. This [code is available for free](https://gitlab.com/libeigen/eigen/-/releases/3.4.0).&#x20;
 
@@ -290,9 +298,15 @@ Source for many of these instructions is Project Chrono documentation. More deta
 
 ## Questions
 
-All questions and suggestions should be directed to the Stackoverflow Teams forum.
+All questions and feature requests (related to this fork of Project Chrono) should be directed to the Discussions at the top of the Repository. Questions related to Project Chrono in general should be directed to their own forum here: https://groups.google.com/g/projectchrono
 
-> #### [Chrono Concrete Forum](https://stackoverflowteams.com/c/concrete-chrono-development)
+> #### [Discussions](https://github.com/Concrete-Chrono-Development/chrono-concrete/discussions)
+
+## Issues and Bugs
+
+All found issues and bugs should be directed to the Issues at the top of the Repository.
+
+> #### [Issues](https://github.com/Concrete-Chrono-Development/chrono-concrete/issues)
 
 ## Wiki, Details, and Examples
 

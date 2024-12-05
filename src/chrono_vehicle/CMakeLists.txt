@@ -107,13 +107,19 @@ if(ENABLE_IRRKLANG)
 
   message(STATUS "IrrKlang include dir: ${IRRKLANG_INSTALL_DIR}")
   message(STATUS "IrrKlang library:     ${IRRKLANG_LIBRARY}")
+  
+  set(HAVE_IRRKLANG TRUE)
 
 else()
 
   mark_as_advanced(FORCE IRRKLANG_INSTALL_DIR)
   mark_as_advanced(FORCE IRRKLANG_LIBRARY)
 
+  set(HAVE_IRRKLANG FALSE)
+
 endif()
+
+SET(HAVE_IRRKLANG "${HAVE_IRRKLANG}" PARENT_SCOPE)
 
 # ----------------------------------------------------------------------------
 # Generate and install configuration file
@@ -227,8 +233,6 @@ set(CV_DRIVER_FILES
     driver/ChPathFollowerDriver.cpp
     driver/ChPathFollowerACCDriver.h
     driver/ChPathFollowerACCDriver.cpp
-    driver/ChExternalDriver.h
-    driver/ChExternalDriver.cpp
     driver/ChInteractiveDriver.h
     driver/ChInteractiveDriver.cpp
 
@@ -290,8 +294,8 @@ if(HAVE_OPENCRG)
 endif()
 if(ENABLE_MODULE_FSI)
     set(CV_TERRAIN_FILES ${CV_TERRAIN_FILES}
-        terrain/SPHTerrain.h
-        terrain/SPHTerrain.cpp    
+        terrain/CRMTerrain.h
+        terrain/CRMTerrain.cpp    
     )
 endif()
 source_group("terrain" FILES ${CV_TERRAIN_FILES})
@@ -472,6 +476,10 @@ set(CV_WV_SUSPENSION_FILES
     wheeled_vehicle/suspension/ChToeBarPushPipeAxle.cpp
     wheeled_vehicle/suspension/ChGenericWheeledSuspension.h
     wheeled_vehicle/suspension/ChGenericWheeledSuspension.cpp
+    wheeled_vehicle/suspension/ChRigidPanhardAxle.cpp
+    wheeled_vehicle/suspension/ChRigidPanhardAxle.h
+    wheeled_vehicle/suspension/ChToeBarRigidPanhardAxle.cpp
+    wheeled_vehicle/suspension/ChToeBarRigidPanhardAxle.h
 
     wheeled_vehicle/suspension/DeDionAxle.h
     wheeled_vehicle/suspension/DeDionAxle.cpp
@@ -517,6 +525,10 @@ set(CV_WV_SUSPENSION_FILES
     wheeled_vehicle/suspension/ToeBarPushPipeAxle.cpp
     wheeled_vehicle/suspension/GenericWheeledSuspension.h
     wheeled_vehicle/suspension/GenericWheeledSuspension.cpp
+    wheeled_vehicle/suspension/RigidPanhardAxle.cpp
+    wheeled_vehicle/suspension/RigidPanhardAxle.h
+    wheeled_vehicle/suspension/ToeBarRigidPanhardAxle.cpp
+    wheeled_vehicle/suspension/ToeBarRigidPanhardAxle.h
 )
 source_group("wheeled_vehicle\\suspension" FILES ${CV_WV_SUSPENSION_FILES})
 
@@ -844,7 +856,7 @@ source_group("" FILES ${CVVSG_FILES})
 source_group("wheeled_vehicle" FILES ${CVVSG_WV_FILES})
 source_group("tracked_vehicle" FILES ${CVVSG_TV_FILES})
 
-# --------------- VEHICLE VSG INTERFACE
+# --------------- VEHICLE OpenGL INTERFACE
 
 if(ENABLE_MODULE_OPENGL)
     set(CVGL_FILES
@@ -1068,6 +1080,18 @@ if(ENABLE_MODULE_VEHICLE_COSIM)
 endif()
 
 set(ENABLE_MODULE_VEHICLE_COSIM  "${ENABLE_MODULE_VEHICLE_COSIM}" PARENT_SCOPE)
+
+#-------------------------------------------------------------------------------
+# Trigger CMake for vehicle FMUs
+#-------------------------------------------------------------------------------
+
+cmake_dependent_option(ENABLE_MODULE_VEHICLE_FMI  "Enable FMI support for Chrono::Vehicle" ON "ENABLE_MODULE_FMI" OFF)
+mark_as_advanced(FORCE ENABLE_MODULE_VEHICLE_FMI)
+if(ENABLE_MODULE_VEHICLE_FMI)
+  add_subdirectory(fmi)
+endif()
+
+set(ENABLE_MODULE_VEHICLE_FMI  "${ENABLE_MODULE_VEHICLE_FMI}" PARENT_SCOPE)
 
 #-------------------------------------------------------------------------------
 # Install Chrono::Vehicle headers

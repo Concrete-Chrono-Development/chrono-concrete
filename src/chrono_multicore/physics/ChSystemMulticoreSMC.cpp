@@ -17,7 +17,6 @@
 #include "chrono_multicore/collision/ChContactContainerMulticoreSMC.h"
 
 using namespace chrono;
-using namespace chrono::collision;
 
 ChSystemMulticoreSMC::ChSystemMulticoreSMC() : ChSystemMulticore() {
     contact_container = chrono_types::make_shared<ChContactContainerMulticoreSMC>(data_manager);
@@ -68,14 +67,9 @@ void ChSystemMulticoreSMC::Setup() {
     data_manager->settings.collision.collision_envelope = 0;
 }
 
-void ChSystemMulticoreSMC::SetCollisionSystemType(ChCollisionSystemType type) {
+void ChSystemMulticoreSMC::SetCollisionSystemType(ChCollisionSystem::Type type) {
     ChSystemMulticore::SetCollisionSystemType(type);
     data_manager->settings.collision.collision_envelope = 0;
-}
-
-void ChSystemMulticoreSMC::SetContactContainer(collision::ChCollisionSystemType type) {
-    contact_container = chrono_types::make_shared<ChContactContainerMulticoreSMC>(data_manager);
-    contact_container->SetSystem(this);
 }
 
 void ChSystemMulticoreSMC::SetContactContainer(std::shared_ptr<ChContactContainer> container) {
@@ -83,8 +77,8 @@ void ChSystemMulticoreSMC::SetContactContainer(std::shared_ptr<ChContactContaine
         ChSystem::SetContactContainer(container);
 }
 
-real3 ChSystemMulticoreSMC::GetBodyContactForce(uint body_id) const {
-    int index = data_manager->host_data.ct_body_map[body_id];
+real3 ChSystemMulticoreSMC::GetBodyContactForce(std::shared_ptr<ChBody> body) const {
+    int index = data_manager->host_data.ct_body_map[body->GetIndex()];
 
     if (index == -1)
         return real3(0);
@@ -92,8 +86,8 @@ real3 ChSystemMulticoreSMC::GetBodyContactForce(uint body_id) const {
     return data_manager->host_data.ct_body_force[index];
 }
 
-real3 ChSystemMulticoreSMC::GetBodyContactTorque(uint body_id) const {
-    int index = data_manager->host_data.ct_body_map[body_id];
+real3 ChSystemMulticoreSMC::GetBodyContactTorque(std::shared_ptr<ChBody> body) const {
+    int index = data_manager->host_data.ct_body_map[body->GetIndex()];
 
     if (index == -1)
         return real3(0);
@@ -107,9 +101,9 @@ void ChSystemMulticoreSMC::PrintStepStats() {
     std::cout << std::endl;
     std::cout << "System Information" << std::endl;
     std::cout << "------------------" << std::endl;
-    std::cout << "  Number of bodies     " << GetNumBodies() << std::endl;
+    std::cout << "  Number of bodies     " << GetNumBodiesActive() << std::endl;
     std::cout << "  Number of contacts   " << GetNumContacts() << std::endl;
-    std::cout << "  Number of bilaterals " << GetNumBilaterals() << std::endl;
+    std::cout << "  Number of bilaterals " << GetNumConstraintsUnilateral() << std::endl;
     std::cout << std::endl;
     std::cout << "Timing Information" << std::endl;
     std::cout << "------------------" << std::endl;

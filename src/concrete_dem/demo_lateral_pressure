@@ -1,0 +1,642 @@
+// =============================================================================
+// PROJECT CHRONO - http://projectchrono.org
+//
+// Copyright (c) 2014 projectchrono.org
+// All rights reserved.
+//
+// Use of this source code is governed by a BSD-style license that can be found
+// in the LICENSE file at the top level of the distribution and at
+// http://projectchrono.org/license-chrono.txt.
+//
+// =============================================================================
+// Authors: Bahar Ayhan
+// =============================================================================
+//
+// Demo code about
+// - filling a container wirh fresh concrete etc. 
+// - using the ChParticleEmitter to create flows of random shapes
+// - use Irrlicht to display objects.
+//
+// =============================================================================
+
+#include "mycontact_V2_2.cpp"
+
+#include "chrono/physics/ChSystemSMC.h"
+#include "ChParticleEmitter_SMC.h"
+#include "ChRandomShapeCreator_SMC.h"
+#include "chrono/particlefactory/ChParticleRemover.h"
+#include "chrono/assets/ChTexture.h"
+
+#include "chrono_thirdparty/rapidjson/prettywriter.h"
+#include "chrono_thirdparty/rapidjson/stringbuffer.h"
+#include "chrono_thirdparty/filesystem/path.h"
+
+#include "chrono_irrlicht/ChVisualSystemIrrlicht.h"
+
+#include "chrono/physics/ChLinkMate.h"
+#include "chrono/physics/ChLinkMotorLinearForce.h"
+#include "chrono/physics/ChLoadsBody.h"
+#include "chrono/physics/ChLoadContainer.h"
+
+// Use the main namespace of Chrono, and other chrono namespaces
+using namespace chrono;
+using namespace chrono::particlefactory;
+using namespace chrono::irrlicht;
+
+
+double calc_aggVolFrac(std::vector<std::shared_ptr<ChBody>> &bodylist, double hlayer, double specimenVol){
+	double avfrac=0;
+	for (auto body:bodylist){
+		if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType()!=0 )
+			continue;
+		double radius=body->GetCollisionModel()->GetShapeDimensions(0)[0]-hlayer;
+		avfrac+=1.3333333333333333333*CH_C_PI*radius*radius*radius;
+	}
+	return avfrac/specimenVol;
+}
+
+
+void delete_particle(ChSystem& sys, double limit_y){	
+	std::list<std::shared_ptr<ChBody> > to_delete;
+	for (auto body:sys.Get_bodylist()){
+		if (body->GetCollisionModel()->GetShape(0)->GetType()!=0 )
+			continue;
+		ChVector<> pos=body->GetPos();
+		
+		if (pos.y()>limit_y){			
+			to_delete.push_back(body);
+		}		
+	}
+	
+	std::list<std::shared_ptr<ChBody> >::iterator ibody = to_delete.begin();
+    while (ibody != to_delete.end()) {
+        sys.Remove((*ibody));
+        ++ibody;
+    }
+}
+
+// -----------------------------------------------------------------------------
+void AddContainerWall(std::shared_ptr<ChBody> body,
+                      std::shared_ptr<ChMaterialSurface> mat,
+                      std::shared_ptr<ChVisualMaterial> vis_mat,
+                      const ChVector<>& size,
+                      const ChVector<>& pos,
+                      bool visible = true) {
+    body->GetCollisionModel()->AddBox(mat, size.x(), size.y(), size.z(), pos);
+
+    if (visible) {
+        auto box = chrono_types::make_shared<ChBoxShape>(size);
+        box->SetMaterial(0, vis_mat);
+        body->AddVisualShape(box, ChFrame<>(pos, QUNIT));
+    }
+}
+
+std::shared_ptr<ChBody> AddGround(ChSystem& sys) {
+    // The fixed body (5 walls)
+    // Contact material for container
+    auto fixed_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();    
+    fixed_mat->SetYoungModulus(1e2); //2e3
+    fixed_mat->SetFriction(0.5);
+    fixed_mat->SetRestitution(0.0f);
+    fixed_mat->SetAdhesion(0);
+	
+	auto fixedBody=chrono_types::make_shared<ChBodyEasyBox>(170, 10, 170, 2.4e-9, true, true, fixed_mat);    
+
+    fixedBody->SetPos(ChVector<>(0, -5, 0));
+	fixedBody->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));	
+	fixedBody->GetVisualShape(0)->SetOpacity(0.4f);
+
+	fixedBody->GetCollisionModel()->SetFamilyGroup(2);
+    fixedBody->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+	
+    sys.AddBody(fixedBody);
+    return fixedBody;
+	
+}
+
+std::shared_ptr<ChBody> AddLeftWall(ChSystem& sys) {
+    // The fixed body (5 walls)
+	
+	// Contact material for container
+    auto fixed_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();    
+    fixed_mat->SetYoungModulus(1e2); //2e3
+    fixed_mat->SetFriction(0.5);
+    fixed_mat->SetRestitution(0.0f);
+    fixed_mat->SetAdhesion(0);
+	
+	auto fixedBody=chrono_types::make_shared<ChBodyEasyBox>(10, 170, 170, 2.4e-9, true, true, fixed_mat);    
+
+    fixedBody->SetPos(ChVector<>(-80, 85, 0));
+	fixedBody->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
+	fixedBody->GetVisualShape(0)->SetOpacity(0.4f);
+	
+	fixedBody->GetCollisionModel()->SetFamilyGroup(2);
+    fixedBody->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+
+    sys.AddBody(fixedBody);
+    return fixedBody;
+	
+}
+
+std::shared_ptr<ChBody> AddRightWall(ChSystem& sys) {
+    // The fixed body (5 walls)
+	// Contact material for container
+    auto fixed_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();    
+    fixed_mat->SetYoungModulus(1e2); //2e3
+    fixed_mat->SetFriction(0.5);
+    fixed_mat->SetRestitution(0.0f);
+    fixed_mat->SetAdhesion(0);
+	
+	auto fixedBody=chrono_types::make_shared<ChBodyEasyBox>(10, 170, 170, 2.4e-9, true, true, fixed_mat);   
+
+    fixedBody->SetPos(ChVector<>(80, 85, 0));	
+	fixedBody->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
+	fixedBody->GetVisualShape(0)->SetOpacity(0.4f);
+
+    fixedBody->GetCollisionModel()->SetFamilyGroup(2);
+    fixedBody->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+
+    sys.AddBody(fixedBody);
+    return fixedBody;
+	
+}
+
+std::shared_ptr<ChBody> AddFrontWall(ChSystem& sys) {
+    // The fixed body (5 walls)
+	// Contact material for container
+    auto fixed_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();    
+    fixed_mat->SetYoungModulus(1e2); //2e3
+    fixed_mat->SetFriction(0.5);
+    fixed_mat->SetRestitution(0.0f);
+    fixed_mat->SetAdhesion(0);
+
+	auto fixedBody=chrono_types::make_shared<ChBodyEasyBox>(150, 170, 10, 2.4e-9, true, true, fixed_mat);    
+
+    fixedBody->SetPos(ChVector<>(0, 85, 80));	
+	fixedBody->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
+	fixedBody->GetVisualShape(0)->SetOpacity(0.4f);
+
+	fixedBody->GetCollisionModel()->SetFamilyGroup(2);
+    fixedBody->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+
+    sys.AddBody(fixedBody);
+    return fixedBody;
+	
+}
+
+std::shared_ptr<ChBody> AddBackWall(ChSystem& sys) {
+    // The fixed body (5 walls)
+	// Contact material for container
+    auto fixed_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();    
+    fixed_mat->SetYoungModulus(1e2); //2e3
+    fixed_mat->SetFriction(0.5);
+    fixed_mat->SetRestitution(0.0f);
+    fixed_mat->SetAdhesion(0);
+	
+	auto fixedBody=chrono_types::make_shared<ChBodyEasyBox>(150, 170, 10, 2.4e-9, true, true, fixed_mat);   
+    //fixedBody->SetBodyFixed(true);
+    fixedBody->SetPos(ChVector<>(0, 85, -80));
+	fixedBody->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
+	fixedBody->GetVisualShape(0)->SetOpacity(0.4f);
+
+    fixedBody->GetCollisionModel()->SetFamilyGroup(2);
+    fixedBody->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+	//fixedBody->GetCollisionModel()->SetFamilyMaskDoCollisionWithFamily(0);
+	
+
+    sys.AddBody(fixedBody);
+    return fixedBody;
+	
+}
+
+std::shared_ptr<ChBody> AddTopWall(ChSystem& sys) {
+    // The fixed body (5 walls)
+	// Contact material for container
+    auto fixed_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();    
+    fixed_mat->SetYoungModulus(1e2); //2e3
+    fixed_mat->SetFriction(0.5);
+    fixed_mat->SetRestitution(0.0f);
+    fixed_mat->SetAdhesion(0);
+	
+	auto fixedBody=chrono_types::make_shared<ChBodyEasyBox>(150, 10, 150, 2.4e-9, true, true, fixed_mat);    
+    //fixedBody->SetBodyFixed(true);
+    fixedBody->SetPos(ChVector<>(0, 160, 0));
+	fixedBody->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
+	fixedBody->GetVisualShape(0)->SetOpacity(0.4f);
+
+    fixedBody->GetCollisionModel()->SetFamilyGroup(2);
+    fixedBody->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+
+    sys.AddBody(fixedBody);
+    return fixedBody;
+	
+}
+
+int main(int argc, char* argv[]) {
+    GetLog() << "Copyright (c) 2017 projectchrono.org\nChrono version: " << CHRONO_VERSION << "\n\n";
+	SetChronoDataPath(CHRONO_DATA_DIR);
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///
+    /// Get the current diectory
+    ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+    std::string current_dir(argv[0]);
+    int pos = current_dir.find_last_of("/\\");
+    current_dir=current_dir.substr(0, pos-5); 
+	//
+    // Create a Chrono physical system
+    ChSystemSMC sys;
+	//
+	sys.Set_G_acc(ChVector<>(0, -9810, 0));
+	sys.SetNumThreads(16,16,1);
+	//
+    // Create the Irrlicht visualization system
+    auto vis = chrono_types::make_shared<ChVisualSystemIrrlicht>();
+    vis->SetWindowSize(800, 600);
+    vis->SetWindowTitle("Particle emitter h=1");
+    vis->Initialize();
+    vis->AddLogo();    
+    vis->AddSkyBox("/chrono-concrete/data/skybox/");
+    vis->AddLight(ChVector<>(250,500,-250), 20, ChColor(255,255,255));
+    vis->AddCamera(ChVector<>(250, 500, -250));
+	//
+    //	
+    // Create basement:   
+    //
+    auto mtruss = chrono_types::make_shared<ChBody>();
+    mtruss->SetBodyFixed(true);
+    sys.Add(mtruss);
+
+    // Create the floor body
+    auto floor_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+	floor_mat->SetYoungModulus(1e2); //2e3
+    floor_mat->SetFriction(0.5);
+    floor_mat->SetRestitution(0.0f);
+    floor_mat->SetAdhesion(0.25);
+
+    auto bottomPlate = AddGround(sys);
+    auto leftPlate = AddLeftWall(sys);
+    auto rightPlate = AddRightWall(sys);
+    auto frontPlate = AddFrontWall(sys);	
+    auto backPlate = AddBackWall(sys);		
+	//
+	//
+	auto constr_bottomPlate = chrono_types::make_shared<ChLinkMateGeneric>(true, true, true, true, true, true);
+    constr_bottomPlate->Initialize(bottomPlate, mtruss, false, bottomPlate->GetFrame_REF_to_abs(), bottomPlate->GetFrame_REF_to_abs()); 
+    sys.Add(constr_bottomPlate);
+	//
+	auto constr_leftPlate = chrono_types::make_shared<ChLinkMateGeneric>(true, true, true, true, true, true);
+    constr_leftPlate->Initialize(leftPlate, mtruss, false, leftPlate->GetFrame_REF_to_abs(), leftPlate->GetFrame_REF_to_abs()); 
+    sys.Add(constr_leftPlate);
+	//
+	auto constr_rightPlate = chrono_types::make_shared<ChLinkMateGeneric>(true, true, true, true, true, true);
+    constr_rightPlate->Initialize(rightPlate, mtruss, false, rightPlate->GetFrame_REF_to_abs(), rightPlate->GetFrame_REF_to_abs()); 
+    sys.Add(constr_rightPlate);
+	//
+	auto constr_frontPlate = chrono_types::make_shared<ChLinkMateGeneric>(true, true, true, true, true, true);
+    constr_frontPlate->Initialize(frontPlate, mtruss, false, frontPlate->GetFrame_REF_to_abs(), frontPlate->GetFrame_REF_to_abs()); 
+    sys.Add(constr_frontPlate);
+	//
+	auto constr_backPlate = chrono_types::make_shared<ChLinkMateGeneric>(true, true, true, true, true, true);
+    constr_backPlate->Initialize(backPlate, mtruss, false, backPlate->GetFrame_REF_to_abs(), backPlate->GetFrame_REF_to_abs()); 
+    sys.Add(constr_backPlate);
+	//
+	//
+	//
+	//	volume of specimen
+	double specimenVol=150*150*150;
+	double Vol=specimenVol*2;
+	// Concrete properties
+	double h_layer=4;
+	double minD=5;
+    double maxD=10;
+	double cement=797;
+	double WtoC=0.40;
+	double AtoC=2.25;
+	double rho_c=3150;
+	double rho_w=1000;
+	double vair=0.03*0;
+	double nF=0.5;	
+	double va=1.0-cement/rho_c-(WtoC*cement)/rho_w-vair;
+	double va0=(1.-pow((minD/maxD),nF))*va;	
+	double Va0=va0*Vol;
+	double rho=cement*(1.0+WtoC+AtoC)*1E-12;
+	double targetmass=Va0*rho;
+	double targetVol=specimenVol*2.5;
+	//double rho=2.4E-9;
+	std::cout<<"targetmass "<<targetmass<<"\n";	
+	std::cout<<"rho "<<rho<<"\n";
+	std::cout<<"va: "<<va<<" va0 "<<va0<<"\n";
+	//
+	//
+	// Define material parameters of fresh concrete
+	//
+	float mortar_layer=4*1.0;  /// 1st param --> 0.75 / 1 / 1.10 / 1.20 / 1.40 
+	float ENm=4.0E-2*1.0;     /// 2nd param --> 0.25 / 0.50 / 1 / 2 / 4
+	float ENa=100;
+	float h=mortar_layer;		
+	float alpha=0.25;
+	float beta=0.5;
+	float np=1.0;
+	float sgmTmax=5.0E-3*1.0;  ///3rd param 0.25 / 0.50 / 1 / 2 / 4
+	float sgmTau0=5.0E-4*1.0;  ///4th param 0.25 / 0.50 / 1 / 2 / 4  
+	float kappa0=100.;
+	float eta_inf=5.0E-5*1.0;/// 5th param 0.25 / 0.50 / 1 / 2 / 4
+	//
+	//
+    //
+    //	Change default contact force algorithm to fresh concrete ones
+	//
+    auto Contact_force_algorithm = chrono_types::make_unique<MyContactForce>();
+	auto materialFCM=chrono_types::make_shared<ChMaterialFCM>(ENm, ENa, mortar_layer, 
+									alpha, beta, np, sgmTmax, sgmTau0, kappa0, eta_inf);
+	Contact_force_algorithm->Set_Material(materialFCM);
+    sys.SetContactForceAlgorithm(std::move(Contact_force_algorithm));
+    //
+    auto container = chrono_types::make_shared<MyContactContainer>();
+    sys.SetContactContainer(container);	
+	//
+    // Create an emitter:
+	//
+    ChParticleEmitter_SMC emitter;
+    // Set the flow rate [particles/s]:
+    emitter.ParticlesPerSecond() = 10000;
+   
+    emitter.SetUseParticleReservoir(true);
+    emitter.ParticleReservoirAmount() = 9000;
+	
+	emitter.SetUseAgregateVolReservoir(true);
+	emitter.SetMortarLayerThickness(mortar_layer);
+    emitter.AggregateVolReservoirAmount() = targetVol;
+
+    // ---Initialize the randomizer for positions
+    auto emitter_positions = chrono_types::make_shared<ChRandomParticlePositionRectangleOutlet>();
+    emitter_positions->Outlet() =
+        ChCoordsys<>(ChVector<>(0, 200, 0), Q_from_AngAxis(CH_C_PI_2, VECT_X));  // center and alignment of the outlet
+    emitter_positions->OutletWidth() = 135;
+    emitter_positions->OutletHeight() = 135;
+
+    emitter.SetParticlePositioner(emitter_positions);
+
+    // ---Initialize the randomizer for alignments
+    auto emitter_rotations = chrono_types::make_shared<ChRandomParticleAlignmentUniform>();
+
+    emitter.SetParticleAligner(emitter_rotations);
+
+    // ---Initialize the randomizer for velocities, with statistical distribution
+    auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
+    mvelo->SetDirection(-VECT_Y);
+    mvelo->SetModulusDistribution(4000.0);
+
+    emitter.SetParticleVelocity(mvelo);
+
+	auto mcreator_spheres = chrono_types::make_shared<ChRandomShapeCreatorSpheres>();
+	mcreator_spheres->SetDiameterDistribution(chrono_types::make_shared<ChConcreteDistribution>(minD, maxD, cement, AtoC, WtoC, mortar_layer));
+	mcreator_spheres->SetDensityDistribution(chrono_types::make_shared<ChConstantDistribution>(rho));	
+	// Create material for sphere body
+    auto sphere_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+	sphere_mat->SetYoungModulus(1e2); //2e3
+    sphere_mat->SetFriction(0.5);
+    sphere_mat->SetRestitution(0.0f);
+    sphere_mat->SetAdhesion(0.2);
+	//
+	mcreator_spheres->SetMaterial(sphere_mat);
+    // Optional: define a callback to be exectuted at each creation of a box particle:
+    class MyCreator_spheres : public ChRandomShapeCreator::AddBodyCallback {
+        // Here do custom stuff on the just-created particle:
+      public:
+        virtual void OnAddBody(std::shared_ptr<ChBody> mbody,
+                               ChCoordsys<> mcoords,
+                               ChRandomShapeCreator& mcreator) override {
+            mbody->GetVisualShape(0)->SetColor(ChColor(1.0f, 1.0f, (float)ChRandom()));
+        }
+    };
+    auto callback_spheres = chrono_types::make_shared<MyCreator_spheres>();
+    mcreator_spheres->RegisterAddBodyCallback(callback_spheres);
+	
+    // Finally, tell to the emitter that it must use the 'mixer' above:
+    emitter.SetParticleCreator(mcreator_spheres);
+	
+    // a- define a class that implement your custom OnAddBody method...
+    class MyCreatorForAll : public ChRandomShapeCreator::AddBodyCallback {
+      public:
+        virtual void OnAddBody(std::shared_ptr<ChBody> mbody,
+                               ChCoordsys<> mcoords,
+                               ChRandomShapeCreator& mcreator) override {
+            
+            vis->BindItem(mbody);
+
+            mbody->SetNoGyroTorque(true);
+        }
+        ChVisualSystemIrrlicht* vis;
+    };
+    // b- create the callback object...
+    auto mcreation_callback = chrono_types::make_shared<MyCreatorForAll>();
+    // c- set callback own data that he might need...
+    mcreation_callback->vis = vis.get();
+    // d- attach the callback to the emitter!
+    emitter.RegisterAddBodyCallback(mcreation_callback);
+	//
+	//
+	// Particle Remover
+	//
+	//
+    ChParticleRemoverBox remover;
+    remover.SetRemoveOutside(true);
+    remover.SetBox(ChVector<>(170, 450, 170), ChFrame<>(ChVector<>(0,0,0), QUNIT));
+	
+    // Simulation loop
+	int step_num=0;
+	char filename[200];
+	const std::string out_dir = current_dir + "/OUT_h1_N/";
+	// Create oputput directories
+    if (!filesystem::create_directory(filesystem::path(out_dir))) {
+        std::cerr << "Error creating directory " << out_dir << std::endl;
+        return 1;
+    }     
+    double timestep = 2.5e-5;
+    //
+    FILE *fptr ;
+    auto outfilename=out_dir+"prism_out.txt";
+    fptr= fopen(outfilename.c_str(), "w");
+    fprintf(fptr,"time\t");
+    fprintf(fptr,"pf_Left\t");
+    fprintf(fptr,"pf_Right\t");
+    fprintf(fptr,"pf_Front\t");
+    fprintf(fptr,"pf_Back\t");
+    fprintf(fptr,"vf_agg\n");
+    //
+    std::vector<std::shared_ptr<ChBody> > wall_list;
+	wall_list.push_back(bottomPlate);
+	wall_list.push_back(leftPlate);
+	wall_list.push_back(rightPlate);
+	wall_list.push_back(frontPlate);
+	wall_list.push_back(backPlate);
+	//
+	std::vector<std::shared_ptr<ChLinkMateGeneric> > const_list;
+	const_list.push_back(constr_bottomPlate);
+	const_list.push_back(constr_leftPlate);
+	const_list.push_back(constr_rightPlate);
+	const_list.push_back(constr_frontPlate);
+	const_list.push_back(constr_backPlate);
+	//
+    auto body_list = sys.Get_bodylist();    
+    while ( sys.GetChTime()<0.75) {
+	
+        // Continuosly create particle flow:
+        emitter.EmitParticles(sys, timestep);
+		
+		// Continuosly check if some particle must be removed:
+        remover.ProcessParticles(sys);
+		//
+        sys.DoStepDynamics(timestep);
+		
+		 if (std::fmod(step_num, 400) ==0) {
+		    sprintf(filename, "%s/prism_va_A%06d.vtk", out_dir.c_str(), step_num);
+		    WriteParticlesVTK(sys, filename, mortar_layer, true);
+		    sprintf(filename, "%s/prism_va_M%06d.vtk", out_dir.c_str(), step_num);
+		    WriteParticlesVTK(sys, filename, mortar_layer, false);		    
+			std::cout<< "filename: "<<filename<<"\n";
+			fprintf(fptr, " %10.6f \t ", sys.GetChTime() );
+		    for(int i=0; i<5; i++){
+		      auto body=wall_list[i];	
+		      auto cont_force = body->GetContactForce();
+			  auto pos = body->GetFrame_COG_to_abs().GetPos();
+              fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", cont_force.x(), cont_force.y(), cont_force.z() );
+			  fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", pos.x(), pos.y(), pos.z() );
+			  auto applForce=const_list[i]->Get_react_force();
+			  fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", applForce.x(), applForce.y(), applForce.z() );
+			  
+		     }
+		     fprintf(fptr, "\n");
+			 
+		 }
+		 
+		 step_num++;
+    }
+    
+	std::cout<<"\n2. phase: remove particles above the prism height\n"<<std::endl;
+    
+    //
+	// 2. phase: remove particles above the prism height
+	//
+    remover.SetRemoveOutside(true);
+    remover.SetBox(ChVector<>(170, 300, 170), ChFrame<>(ChVector<>(0,0,0), QUNIT));
+	
+	auto t1=sys.GetChTime();
+	double kk=1;
+
+	//
+    while ( sys.GetChTime()<t1+0.75) {
+		
+		// Continuosly check if some particle must be removed:
+        remover.ProcessParticles(sys);
+		//
+        sys.DoStepDynamics(timestep);
+		
+		 if (std::fmod(step_num, 400) ==0) {
+		    sprintf(filename, "%s/prism_va_A%06d.vtk", out_dir.c_str(), step_num);
+		    WriteParticlesVTK(sys, filename, mortar_layer, true);
+		    sprintf(filename, "%s/prism_va_M%06d.vtk", out_dir.c_str(), step_num);
+		    WriteParticlesVTK(sys, filename, mortar_layer, false);		    
+			std::cout<< "filename: "<<filename<<"\n";
+			fprintf(fptr, " %10.6f \t ", sys.GetChTime() );
+		    for(int i=0; i<5; i++){
+		      auto body=wall_list[i];	
+		      auto cont_force = body->GetContactForce();
+			  auto pos = body->GetFrame_COG_to_abs().GetPos();
+              fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", cont_force.x(), cont_force.y(), cont_force.z() );
+			  fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", pos.x(), pos.y(), pos.z() );
+			  auto applForce=const_list[i]->Get_react_force();
+			  fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", applForce.x(), applForce.y(), applForce.z() );  
+		     }
+			 std::vector<std::shared_ptr<ChBody>> bodylist=sys.Get_bodylist();
+			 double aggVolFrac=calc_aggVolFrac(bodylist, mortar_layer, specimenVol);
+			 fprintf(fptr, " %10.6f\t ", aggVolFrac);
+		     fprintf(fptr, "\n");
+			 //
+			 double rho_new=materialFCM->CalculateEffDensity(sys, specimenVol, rho);
+			 std::cout<<"rho_new "<<rho_new<<std::endl;
+			 materialFCM->ModifyDensity(sys, rho_new);
+			 kk++;
+		 }
+		 
+		 step_num++;
+    }
+	//
+	// Add top plate, apply boundary conditions and apply force
+	//
+	auto load_container = chrono_types::make_shared<ChLoadContainer>();
+    sys.Add(load_container);
+	//
+	auto topPlate = AddTopWall(sys);
+	vis->BindItem(topPlate);
+	wall_list.push_back(topPlate);
+	//
+	auto constr_topPlate = chrono_types::make_shared<ChLinkMateGeneric>(true, false, true, true, true, true);
+    constr_topPlate->Initialize(topPlate, mtruss, false, topPlate->GetFrame_REF_to_abs(), topPlate->GetFrame_REF_to_abs()); 
+    sys.Add(constr_topPlate);
+	const_list.push_back(constr_topPlate);
+	//
+	auto body_force = chrono_types::make_shared<ChLoadBodyForce>(topPlate, ChVector<>(0, 5.2974, 0), false, ChVector<>(0, 0, 0));
+    load_container->Add(body_force);
+	//
+	//
+	// Create the linear motor between back and front wall
+	//	
+	//
+	double pressure=0.1/1000;
+    auto motorY = chrono_types::make_shared<ChLinkMotorLinearForce>();   
+    motorY->Initialize(topPlate,               // slave body
+                       mtruss,                // master body
+                       ChFrame<>(topPlate->GetPos(), Q_from_AngZ(CH_C_PI_2) )  // motor frame, in abs. coords
+    );
+    sys.Add(motorY);    
+    auto mFy = chrono_types::make_shared<ChFunction_Const>(-pressure*150*150);   
+    motorY->SetForceFunction(mFy);
+	//
+	//
+	//
+	auto t2=sys.GetChTime();
+    while ( sys.GetChTime()<t2+1.5) {
+	
+		//
+        sys.DoStepDynamics(timestep);
+	
+		 if (std::fmod(step_num, 400) ==0) {
+		    sprintf(filename, "%s/prism_va_A%06d.vtk", out_dir.c_str(), step_num);
+		    WriteParticlesVTK(sys, filename, mortar_layer, true);
+		    sprintf(filename, "%s/prism_va_M%06d.vtk", out_dir.c_str(), step_num);
+		    WriteParticlesVTK(sys, filename, mortar_layer, false);		    
+			std::cout<< "filename: "<<filename<<"\n";
+			fprintf(fptr, " %10.6f \t ", sys.GetChTime() );
+		    for(int i=0; i<6; i++){
+		      auto body=wall_list[i];	
+		      auto cont_force = body->GetContactForce();
+			  auto pos = body->GetFrame_COG_to_abs().GetPos();
+                      fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", cont_force.x(), cont_force.y(), cont_force.z() );
+					  fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", pos.x(), pos.y(), pos.z() );
+			  ChVector<> applForce;
+			  if (i<5){
+				 applForce=const_list[i]->Get_react_force();
+			  }else{ 
+				 applForce=body->GetAppliedForce();
+			  }
+			  fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", applForce.x(), applForce.y(), applForce.z() );	
+					  
+		     }
+			 std::vector<std::shared_ptr<ChBody>> bodylist=sys.Get_bodylist();
+			 double aggVolFrac=calc_aggVolFrac(bodylist, mortar_layer, specimenVol);
+			 fprintf(fptr, " %10.6f\t ", aggVolFrac);
+		     fprintf(fptr, "\n");
+			 //delete_particle(sys, 150.);
+		     
+		 }
+		 
+		 step_num++;
+    }
+
+    fclose (fptr);
+    return 0;
+}

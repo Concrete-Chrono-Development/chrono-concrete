@@ -24,17 +24,17 @@
     #include "chrono_multicore/physics/Ch3DOFContainer.h"
 #endif
 
-#include "chrono/assets/ChBoxShape.h"
-#include "chrono/assets/ChSphereShape.h"
-#include "chrono/assets/ChEllipsoidShape.h"
-#include "chrono/assets/ChConeShape.h"
-#include "chrono/assets/ChCylinderShape.h"
-#include "chrono/assets/ChRoundedBoxShape.h"
-#include "chrono/assets/ChCapsuleShape.h"
-#include "chrono/assets/ChTriangleMeshShape.h"
+#include "chrono/assets/ChVisualShapeBox.h"
+#include "chrono/assets/ChVisualShapeSphere.h"
+#include "chrono/assets/ChVisualShapeEllipsoid.h"
+#include "chrono/assets/ChVisualShapeCone.h"
+#include "chrono/assets/ChVisualShapeCylinder.h"
+#include "chrono/assets/ChVisualShapeRoundedBox.h"
+#include "chrono/assets/ChVisualShapeCapsule.h"
+#include "chrono/assets/ChVisualShapeTriangleMesh.h"
 #include "chrono/solver/ChIterativeSolverVI.h"
-#include "chrono/assets/ChLineShape.h"
-#include "chrono/assets/ChPathShape.h"
+#include "chrono/assets/ChVisualShapeLine.h"
+#include "chrono/assets/ChVisualShapePath.h"
 
 #include "chrono/physics/ChParticleCloud.h"
 
@@ -217,9 +217,9 @@ void ChOpenGLViewer::Render(bool render_stats) {
         model_obj.clear();
         line_path_data.clear();
         for (auto s : m_vis->GetSystems()) {
-            for (const auto& b : s->Get_bodylist())
+            for (const auto& b : s->GetBodies())
                 DrawVisualModel(b);
-            for (const auto& l : s->Get_linklist())
+            for (const auto& l : s->GetLinks())
                 DrawVisualModel(l);
         }
         if (model_box.size() > 0) {
@@ -253,13 +253,13 @@ void ChOpenGLViewer::Render(bool render_stats) {
     } else {
         size_t cloud_size = 0;
         for (auto s : m_vis->GetSystems())
-            cloud_size += s->Get_bodylist().size();
+            cloud_size += s->GetBodies().size();
         cloud_data.resize(cloud_size);
         for (auto s : m_vis->GetSystems()) {
 #pragma omp parallel for
-            for (int i = 0; i < s->Get_bodylist().size(); i++) {
-                auto abody = s->Get_bodylist().at(i);
-                ChVector<> pos = abody->GetPos();
+            for (int i = 0; i < s->GetBodies().size(); i++) {
+                auto abody = s->GetBodies().at(i);
+                ChVector3d pos = abody->GetPos();
                 cloud_data[i] = glm::vec3(pos.x(), pos.y(), pos.z());
             }
         }
@@ -305,7 +305,7 @@ void ChOpenGLViewer::DrawVisualModel(std::shared_ptr<ChPhysicsItem> item) {
     // Get the visual model reference frame
     const ChFrame<>& X_AM = item->GetVisualModelFrame();
 
-    for (auto& shape_instance : item->GetVisualModel()->GetShapes()) {
+    for (auto& shape_instance : item->GetVisualModel()->GetShapeInstances()) {
         const auto& shape = shape_instance.first;
         const auto& X_SM = shape_instance.second;
 
@@ -313,31 +313,31 @@ void ChOpenGLViewer::DrawVisualModel(std::shared_ptr<ChPhysicsItem> item) {
         auto pos = X_SA.GetPos();
         auto rot = X_SA.GetRot();
         double angle;
-        Vector axis;
-        rot.Q_to_AngAxis(angle, axis);
+        ChVector3d axis;
+        rot.GetAngleAxis(angle, axis);
 
-        if (ChSphereShape* sphere_shape = dynamic_cast<ChSphereShape*>(shape.get())) {
+        if (ChVisualShapeSphere* sphere_shape = dynamic_cast<ChVisualShapeSphere*>(shape.get())) {
             double radius = sphere_shape->GetRadius();
 
             model = glm::translate(glm::mat4(1), glm::vec3(pos.x(), pos.y(), pos.z()));
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
             model = glm::scale(model, glm::vec3(radius, radius, radius));
             model_sphere.push_back(model);
-        } else if (ChEllipsoidShape* ellipsoid_shape = dynamic_cast<ChEllipsoidShape*>(shape.get())) {
-            Vector radius = ellipsoid_shape->GetSemiaxes();
+        } else if (ChVisualShapeEllipsoid* ellipsoid_shape = dynamic_cast<ChVisualShapeEllipsoid*>(shape.get())) {
+            ChVector3d radius = ellipsoid_shape->GetSemiaxes();
 
             model = glm::translate(glm::mat4(1), glm::vec3(pos.x(), pos.y(), pos.z()));
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
             model = glm::scale(model, glm::vec3(radius.x(), radius.y(), radius.z()));
             model_sphere.push_back(model);
-        } else if (ChBoxShape* box_shape = dynamic_cast<ChBoxShape*>(shape.get())) {
-            const Vector& size = box_shape->GetHalflengths();
+        } else if (ChVisualShapeBox* box_shape = dynamic_cast<ChVisualShapeBox*>(shape.get())) {
+            const ChVector3d& size = box_shape->GetHalflengths();
 
             model = glm::translate(glm::mat4(1), glm::vec3(pos.x(), pos.y(), pos.z()));
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
             model = glm::scale(model, glm::vec3(size.x(), size.y(), size.z()));
             model_box.push_back(model);
-        } else if (ChCylinderShape* cylinder_shape = dynamic_cast<ChCylinderShape*>(shape.get())) {
+        } else if (ChVisualShapeCylinder* cylinder_shape = dynamic_cast<ChVisualShapeCylinder*>(shape.get())) {
             double rad = cylinder_shape->GetRadius();
             double height = cylinder_shape->GetHeight();
 
@@ -345,7 +345,7 @@ void ChOpenGLViewer::DrawVisualModel(std::shared_ptr<ChPhysicsItem> item) {
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
             model = glm::scale(model, glm::vec3(rad, rad, height));
             model_cylinder.push_back(model);
-        } else if (ChConeShape* cone_shape = dynamic_cast<ChConeShape*>(shape.get())) {
+        } else if (ChVisualShapeCone* cone_shape = dynamic_cast<ChVisualShapeCone*>(shape.get())) {
             double radius = cone_shape->GetRadius();
             double height = cone_shape->GetHeight();
 
@@ -353,7 +353,7 @@ void ChOpenGLViewer::DrawVisualModel(std::shared_ptr<ChPhysicsItem> item) {
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
             model = glm::scale(model, glm::vec3(radius, radius, height));
             model_cone.push_back(model);
-        } else if (ChCapsuleShape* capsule_shape = dynamic_cast<ChCapsuleShape*>(shape.get())) {
+        } else if (ChVisualShapeCapsule* capsule_shape = dynamic_cast<ChVisualShapeCapsule*>(shape.get())) {
             double rad = capsule_shape->GetRadius();
             double height = capsule_shape->GetHeight();
 
@@ -371,7 +371,7 @@ void ChOpenGLViewer::DrawVisualModel(std::shared_ptr<ChPhysicsItem> item) {
             model = glm::translate(glm::mat4(1), glm::vec3(pos.x() + s2.x, pos.y() + s2.y, pos.z() + s2.z));
             model = glm::scale(model, glm::vec3((float)rad));
             model_sphere.push_back(model);
-        } else if (ChTriangleMeshShape* trimesh_shape = dynamic_cast<ChTriangleMeshShape*>(shape.get())) {
+        } else if (ChVisualShapeTriangleMesh* trimesh_shape = dynamic_cast<ChVisualShapeTriangleMesh*>(shape.get())) {
             model = glm::translate(glm::mat4(1), glm::vec3(pos.x(), pos.y(), pos.z()));
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
 
@@ -383,37 +383,36 @@ void ChOpenGLViewer::DrawVisualModel(std::shared_ptr<ChPhysicsItem> item) {
             } else {
                 model_obj[trimesh_shape->GetName()].push_back(model);
             }
-        } else if (ChLineShape* line_shape = dynamic_cast<ChLineShape*>(shape.get())) {
+        } else if (ChVisualShapeLine* line_shape = dynamic_cast<ChVisualShapeLine*>(shape.get())) {
             auto mline = line_shape->GetLineGeometry();
             auto npoints = line_shape->GetNumRenderPoints();
 
             double maxU = 1;
-            if (auto mline_path = std::dynamic_pointer_cast<geometry::ChLinePath>(mline))
+            if (auto mline_path = std::dynamic_pointer_cast<ChLinePath>(mline))
                 maxU = mline_path->GetPathDuration();
 
-            ChVector<> t2;
-            mline->Evaluate(t2, 0.0);
+            ChVector3d t2 = mline->Evaluate(0.0);
             t2 = X_SA.TransformPointLocalToParent(t2);
             line_path_data.push_back(glm::vec3(t2.x(), t2.y(), t2.z()));
 
             for (unsigned int ig = 1; ig < npoints; ig++) {
                 double mU = maxU * ((double)ig / (double)(npoints - 1));  // abscissa
 
-                mline->Evaluate(t2, mU);
+                t2 = mline->Evaluate(mU);
                 t2 = X_SA.TransformPointLocalToParent(t2);
                 line_path_data.push_back(glm::vec3(t2.x(), t2.y(), t2.z()));
                 line_path_data.push_back(glm::vec3(t2.x(), t2.y(), t2.z()));
             }
 
-            mline->Evaluate(t2, maxU);
+            t2 = mline->Evaluate(maxU);
             t2 = X_SA.TransformPointLocalToParent(t2);
             line_path_data.push_back(glm::vec3(t2.x(), t2.y(), t2.z()));
         }
         /*
-        else if (ChRoundedBoxShape* shape = dynamic_cast<ChRoundedBoxShape*>(asset.get())) {
-            Vector rad = shape->GetHalflengths();
+        else if (ChVisualShapeRoundedBox* shape = dynamic_cast<ChVisualShapeRoundedBox*>(asset.get())) {
+            ChVector3d rad = shape->GetHalflengths();
             double radsphere = shape->GetRadius();
-            ChVector<> pos_final = pos + center;
+            ChVector3d pos_final = pos + center;
             model = glm::translate(glm::mat4(1), glm::vec3(pos_final.x(), pos_final.y(), pos_final.z()));
             model = glm::rotate(model, float(angle), glm::vec3(axis.x(), axis.y(), axis.z()));
             model = glm::scale(model, glm::vec3(rad.x(), rad.y(), rad.z()));
@@ -599,11 +598,11 @@ void ChOpenGLViewer::RenderFluid() {
 void ChOpenGLViewer::RenderParticles() {
     size_t num_particles = 0;
     for (auto s : m_vis->GetSystems()) {
-        for (auto& item : s->Get_otherphysicslist()) {
+        for (auto& item : s->GetOtherPhysicsItems()) {
             if (auto pcloud = std::dynamic_pointer_cast<ChParticleCloud>(item)) {
                 if (!pcloud->GetVisualModel())
                     continue;
-                num_particles += pcloud->GetNparticles();
+                num_particles += pcloud->GetNumParticles();
             }
         }
     }
@@ -620,14 +619,14 @@ void ChOpenGLViewer::RenderParticles() {
 
     num_particles = 0;
     for (auto s : m_vis->GetSystems()) {
-        for (auto& item : s->Get_otherphysicslist()) {
+        for (auto& item : s->GetOtherPhysicsItems()) {
             if (auto pcloud = std::dynamic_pointer_cast<ChParticleCloud>(item)) {
                 if (!pcloud->GetVisualModel())
                     continue;
 
                 size_t n = 0;
-                for (int i = 0; i < pcloud->GetNparticles(); i++) {
-                    const auto& pos = pcloud->GetParticle(i).GetPos();
+                for (int i = 0; i < pcloud->GetNumParticles(); i++) {
+                    const auto& pos = pcloud->Particle(i).GetPos();
                     if (!m_vis->particle_selector || m_vis->particle_selector->Render(pos)) {
                         particle_data[num_particles + n++] = glm::vec3(pos.x(), pos.y(), pos.z());
                     }
@@ -726,65 +725,6 @@ void ChOpenGLViewer::RenderGrid() {
 #endif
     glm::mat4 model(1);
     grid.Draw(projection, view * model);
-
-///======
-#ifdef CHRONO_MULTICORE
-/*mpm_grid_data.clear();
-mpm_node_data.clear();
-if (ChSystemMulticoreNSC* parallel_sys = dynamic_cast<ChSystemMulticoreNSC*>(physics_system)) {
-    vec3 bins_per_axis;
-    real3 bin_size_vec;
-    real3 min_pt;
-    real3 max_pt;
-    real3 center;
-    real bin_edge;
-    uint num_mpm_nodes;
-
-
-    mpm_node_data.resize(num_mpm_nodes);
-    for (int i = 0; i < num_mpm_nodes; i++) {
-        vec3 g = GridDecode(i, bins_per_axis);
-        real3 current_node_location = NodeLocation(g.x, g.y, g.z, bin_edge, min_pt);
-        mpm_node_data[i] = glm::vec3(current_node_location.x, current_node_location.y,
-        current_node_location.z);
-    }
-    mpm_node.SetPointSize(.002);
-    mpm_node.Update(mpm_node_data);
-    mpm_node.Draw(projection, view * model);
-    glm::vec3 offset = glm::vec3(.5 * bin_size_vec.x, .5 * bin_size_vec.x, .5 * bin_size_vec.x);
-    for (int i = 0; i <= bins_per_axis.x; i++) {
-        mpm_grid_data.push_back(glm::vec3(i * bin_size_vec.x + min_pt.x, center.y, min_pt.z) - offset);
-        mpm_grid_data.push_back(glm::vec3(i * bin_size_vec.x + min_pt.x, center.y, max_pt.z) - offset);
-    }
-    for (int i = 0; i <= bins_per_axis.z; i++) {
-        mpm_grid_data.push_back(glm::vec3(min_pt.x, center.y, i * bin_size_vec.z + min_pt.z) - offset);
-        mpm_grid_data.push_back(glm::vec3(max_pt.x, center.y, i * bin_size_vec.z + min_pt.z) - offset);
-    }
-
-    for (int i = 0; i <= bins_per_axis.y; i++) {
-        mpm_grid_data.push_back(glm::vec3(min_pt.x, i * bin_size_vec.y + min_pt.y, center.z) - offset);
-        mpm_grid_data.push_back(glm::vec3(max_pt.x, i * bin_size_vec.y + min_pt.y, center.z) - offset);
-    }
-    for (int i = 0; i <= bins_per_axis.y; i++) {
-        mpm_grid_data.push_back(glm::vec3(center.x, i * bin_size_vec.y + min_pt.y, min_pt.z) - offset);
-        mpm_grid_data.push_back(glm::vec3(center.x, i * bin_size_vec.y + min_pt.y, max_pt.z) - offset);
-    }
-
-    for (int i = 0; i <= bins_per_axis.x; i++) {
-        mpm_grid_data.push_back(glm::vec3(i * bin_size_vec.x + min_pt.x, min_pt.y, center.z) - offset);
-        mpm_grid_data.push_back(glm::vec3(i * bin_size_vec.x + min_pt.x, max_pt.y, center.z) - offset);
-    }
-    for (int i = 0; i <= bins_per_axis.z; i++) {
-        mpm_grid_data.push_back(glm::vec3(center.x, min_pt.y, i * bin_size_vec.z + min_pt.z) - offset);
-        mpm_grid_data.push_back(glm::vec3(center.x, max_pt.y, i * bin_size_vec.z + min_pt.z) - offset);
-    }
-
-    mpm_grid.Update(mpm_grid_data);
-    glm::mat4 model(1);
-
-    mpm_grid.Draw(projection, view * model);
-}*/
-#endif
 }
 
 void ChOpenGLViewer::RenderPlots() {
