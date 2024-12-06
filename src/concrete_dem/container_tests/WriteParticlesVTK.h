@@ -369,17 +369,16 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   material->SetFriction(0.2);
 
   // calculate updated density
-  double density_old = 797 * (1 + 0.4 + 2.25);
+  double density_old = 845 * (1 + 0.21 + 1.2422);
   double V_l = 0;  // volume of particles in container
   for (int i =0; i < particle_number; ++i) {
     V_l += double(4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3);
   }
-  double density_new = (density_old * 0.15 * 0.15 * 0.15) / V_l;
+  double specimenVol=( CH_C_PI*pow(101.6/2,2)*50.8*2/3- CH_C_PI*pow(69.85/2,2)*50.8/3);
+  double density_new = ((density_old * specimenVol) / V_l) * 1e-12;
   GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
   GetLog() << "Total volume of particles in container: " << V_l << "\n";
   GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
-  density_new = 845 * (1.0 + 0.21 + 1.2422) * 1e-12;
-  GetLog() << "Set new density manually. In tones. Change inf future" << density_new << "\n";
   for (int i = 0; i < particle_number; ++i) {
     if (particle_pos[i].z() > limit || particle_pos[i] < 0 || abs(particle_pos[i].x()) > limit/2 ||
 	abs(particle_pos[i].y()) > limit/2)

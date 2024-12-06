@@ -441,7 +441,7 @@ void AddFallingItems(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis
     //auto numSpheres_new=body_points_new.size();
     //double radius=mydistribution->GetRandom()/2;  
 	double radius=body_radius[i];
-    double mass = rho/2*4/3*pow(radius, 3)*CH_C_PI;
+    double mass = rho*4/3*pow(radius, 3)*CH_C_PI;
                 
     auto body = chrono_types::make_shared<ChBody>();
     body->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 2) * ChVector<>(1, 1, 1));
@@ -876,7 +876,7 @@ int main(int argc, char* argv[]) {
 			if (rho_new<rho/4.)
 				rho_new=rho/4.;
 			std::cout<<"max_y: "<<max_y<<" rho_new: "<<rho_new<<"\t";
-			materialFCM->ModifyDensity(sys, rho_new);
+			//			materialFCM->ModifyDensity(sys, rho_new);
 			//
 			std::vector<std::shared_ptr<ChBody>> bodylist=sys.Get_bodylist();
 			double aggVolFrac=calc_aggVolFrac(bodylist, mortar_layer, specimenVol);
