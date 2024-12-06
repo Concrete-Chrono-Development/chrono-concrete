@@ -16,23 +16,23 @@ using namespace chrono;
 
 class MyContactReport : public chrono::ChContactContainer::ReportContactCallback {
   struct CollisionData {
-    ChVector<> pA; ///< contact pA
-    ChVector<> pB; ///< contact pB
+    ChVector3d pA; ///< contact pA
+    ChVector3d pB; ///< contact pB
     ChMatrix33<> plane_coord;  ///< contact plane coordsystem (A column 'X' is contact normal)
     double distance;  ///< contact distance
     double eff_radius;  ///< effective radius of curvature at contact
-    ChVector<> react_forces; ///< react.forces (if already computed). In coordsystem 'plane_coord'
-    ChVector<> react_torques;  ///< react.torques, if rolling friction (if already computed).
+    ChVector3d react_forces; ///< react.forces (if already computed). In coordsys 'plane_coord'
+    ChVector3d react_torques;  ///< react.torques, if rolling friction (if already computed).
     ChContactable* contactobjA;  ///< model A (could be nullptr for some containers)
     ChContactable* contactobjB;  ///< model B (could be nullptr for some containers)
     CollisionData(
-		  const ChVector<>& fpA,
-		  const ChVector<>& fpB,
+		  const ChVector3d& fpA,
+		  const ChVector3d& fpB,
 		  const ChMatrix33<>& fplane_coord,
 		  const double& fdistance,
 		  const double& feff_radius,
-		  const ChVector<>& freact_forces,
-		  const ChVector<>& freact_torques,
+		  const ChVector3d& freact_forces,
+		  const ChVector3d& freact_torques,
 		  ChContactable* fcontactobjA,
 		  ChContactable* fcontactobjB
         ) {
@@ -51,13 +51,13 @@ class MyContactReport : public chrono::ChContactContainer::ReportContactCallback
   std::vector<CollisionData> VectorOfCollisionData;
 
   bool OnReportContact(
-		       const ChVector<>& pA,
-		       const ChVector<>& pB,
+		       const ChVector3d& pA,
+		       const ChVector3d& pB,
 		       const ChMatrix33<>& plane_coord,
 		       const double& distance,
 		       const double& eff_radius,
-		       const ChVector<>& react_forces,
-		       const ChVector<>& react_torques,
+		       const ChVector3d& react_forces,
+		       const ChVector3d& react_torques,
 		       ChContactable* contactobjA,
 		       ChContactable* contactobjB
 		       ) override {

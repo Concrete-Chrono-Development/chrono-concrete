@@ -21,12 +21,12 @@
 
 #include <vector>
 #include "chrono_multicore/physics/ChSystemMulticore.h"
-#include "chrono/collision/ChCollisionSystemBullet.h"
+//#include "chrono/collision/ChCollisionSystemBullet.h"
 #include "chrono/assets/ChVisualSystem.h"
 #include "chrono/utils/ChUtilsCreators.h"
 #include "chrono/particlefactory/ChParticleRemover.h"
 #include "chrono/particlefactory/ChParticleEmitter.h"
-#include "chrono/core/ChDistribution.h"
+//#include "chrono/core/ChDistribution.h"
 // improve this include to remove full path
 #include "/home/mariusz/PROJECT_CHRONO/SRC/src/concrete_dem/container_tests/MyContactReport.h"
 #include "chrono/core/ChMathematics.h"

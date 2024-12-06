@@ -15,12 +15,12 @@ using namespace chrono;
 
 void write_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) {
   // Get the number of particles
-  auto body_list= sys.Get_bodylist();
+  auto body_list= sys.GetBodies();
   int num_particles = 0;
   
   // count spheres (for generality, as system may contain other shapes)
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
     ++num_particles;
   }
@@ -35,9 +35,9 @@ void write_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename)
   // Write the particle positions
   vtk_file << "POINTS " << num_particles << " float\n";
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    ChVector<float> pos = body->GetPos();
+    ChVector3d pos = body->GetPos();
     vtk_file << pos.x() << " " << pos.y() << " " << pos.z() << "\n";
   }
 
@@ -58,44 +58,45 @@ void write_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename)
   vtk_file << "SCALARS radius float 1\n";
   vtk_file << "LOOKUP_TABLE default\n";
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    vtk_file << body->GetCollisionModel()->GetShapeDimensions(0)[0] << "\n";
+    auto temp_shape = body->GetCollisionModel()->GetShapeInstance(0).first;
+    vtk_file << dynamic_cast<ChCollisionShapeSphere*>(temp_shape.get())->GetRadius() << "\n";
   }
 
   // Write the particle linear velocities
   vtk_file << "\nVECTORS l_velocity float\n";
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    ChVector<float> vel = body->GetPos_dt();
+    ChVector3d vel = body->GetPosDt();
     vtk_file << vel.x() << " " << vel.y() << " " << vel.z() << "\n";
   }
 
   // Write the particle angular velocities
   vtk_file << "\nVECTORS ang_velocity float\n";
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    ChVector<float> vel = body->GetWvel_par();  // angular speed in parent coords
+    ChVector3d vel = body->GetAngVelParent();  // angular speed in parent coords
     vtk_file << vel.x() << " " << vel.y() << " " << vel.z() << "\n";
   }
 
   // Write the force acting on particle
   vtk_file << "\nVECTORS force float\n";
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    ChVector<float> force = body->GetAppliedForce();  // probably in parent (global) coords
+    ChVector3d force = body->GetAppliedForce();  // probably in parent (global) coords
     vtk_file << force.x() << " " << force.y() << " " << force.z() << "\n";
   }
 
   // Write the torque acting on particle
   vtk_file << "\nVECTORS torque float\n";
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    ChVector<float> torque = body->GetAppliedTorque();  // probably in local coords
+    ChVector3d torque = body->GetAppliedTorque();  // probably in local coords
     vtk_file << torque.x() << " " << torque.y() << " " << torque.z() << "\n";
   }
 
@@ -104,14 +105,14 @@ void write_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename)
   float total_trans_kin_e = 0;
   float total_rot_kin_e = 0;
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
     auto mass = body->GetMass();
     auto inertia = body->GetInertiaXX();
     float trans_kin_e = 0;  // transnational kinetic energy
     float rot_kin_e = 0;  // rotational kinetic energy
-    ChVector<float> vel_t = body->GetPos_dt();
-    ChVector<float> vel_r = body->GetWvel_par();
+    ChVector3d vel_t = body->GetPosDt();
+    ChVector3d vel_r = body->GetAngVelParent();
     trans_kin_e = 0.5 * mass * (pow(vel_t.x(), 2) + pow(vel_t.y(), 2) + pow(vel_t.z(), 2));
     rot_kin_e = 0.5 * (inertia.x()*pow(vel_r.x(), 2) + inertia.y()*pow(vel_r.y(), 2)
 		       + inertia.z()*pow(vel_r.z(), 2));
@@ -161,7 +162,7 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
   }
 
   // read particle positions
-  std::vector<ChVector<>> particle_pos;
+  std::vector<ChVector3d> particle_pos;
   std::string temp;
   float temp_number;
   for (int i = 0; i < particle_number; ++i){
@@ -173,7 +174,7 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
       std::stringstream(temp) >> temp_number;
       coordinates.push_back(temp_number);
     }
-    particle_pos.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+    particle_pos.push_back(ChVector3d(coordinates[0], coordinates[1], coordinates[2]));
   }
 
   // read particle radius
@@ -192,7 +193,7 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
   }
 
   // read particle translation velocity
-  std::vector<ChVector<>> particle_l_velocity;
+  std::vector<ChVector3d> particle_l_velocity;
   while (std::getline(vtk_file, line)) {
     if (line.find("l_velocity") != std::string::npos) {
       for (int i = 0; i < particle_number; ++i) {
@@ -204,14 +205,14 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
 	  std::stringstream(temp) >> temp_number;
 	  coordinates.push_back(temp_number);
 	}
-	particle_l_velocity.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+	particle_l_velocity.push_back(ChVector3d(coordinates[0], coordinates[1], coordinates[2]));
       }
       break;
     }
   }
 
   // read particle angular velocity
-  std::vector<ChVector<>> particle_ang_velocity;
+  std::vector<ChVector3d> particle_ang_velocity;
   while (std::getline(vtk_file, line)) {
     if (line.find("ang_velocity") != std::string::npos) {
       for (int i = 0; i < particle_number; ++i) {
@@ -223,7 +224,7 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
 	  std::stringstream(temp) >> temp_number;
 	  coordinates.push_back(temp_number);
 	}
-	particle_ang_velocity.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+	particle_ang_velocity.push_back(ChVector3d(coordinates[0], coordinates[1], coordinates[2]));
       }
       break;
     }
@@ -231,26 +232,25 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
   vtk_file.close();
 
   // create particles
-  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  auto material = chrono_types::make_shared<ChContactMaterialSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
   material->SetFriction(0.2);
   double density = 797 * (1 + 0.4 + 2.25);
   for (int i = 0; i < particle_number; ++i) {
-    auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+    auto ball = chrono_types::make_shared<ChBody>();
     double mass = ((4.0 / 3.0) * 3.1415 * pow(particle_radiuses[i], 3)) * density;
     ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
-		       chrono::ChVector<>(1, 1, 1));
+		       chrono::ChVector3d(1, 1, 1));
     ball->SetMass(mass);
     ball->SetPos(particle_pos[i]);
-    ball->SetPos_dt(particle_l_velocity[i]);
-    ball->SetWvel_par(particle_ang_velocity[i]);
-    ball->GetCollisionModel()->ClearModel();
+    ball->SetPosDt(particle_l_velocity[i]);
+    ball->SetAngVelParent(particle_ang_velocity[i]);
+    ball->GetCollisionModel()->Clear();
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
-    ball->SetBodyFixed(false);
-    ball->SetCollide(true);
-    ball->GetCollisionModel()->BuildModel();
+    ball->SetFixed(false);
+    ball->EnableCollision(true);
 #ifdef IRR
     auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
     sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
@@ -292,7 +292,7 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   }
 
   // read particle positions
-  std::vector<ChVector<>> particle_pos;
+  std::vector<ChVector3d> particle_pos;
   std::string temp;
   float temp_number;
   for (int i = 0; i < particle_number; ++i){
@@ -304,7 +304,7 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
       std::stringstream(temp) >> temp_number;
       coordinates.push_back(temp_number);
     }
-    particle_pos.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+    particle_pos.push_back(ChVector3d(coordinates[0], coordinates[1], coordinates[2]));
   }
 
   // read particle radius
@@ -323,7 +323,7 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   }
 
   // read particle translation velocity
-  std::vector<ChVector<>> particle_l_velocity;
+  std::vector<ChVector3d> particle_l_velocity;
   while (std::getline(vtk_file, line)) {
     if (line.find("l_velocity") != std::string::npos) {
       for (int i = 0; i < particle_number; ++i) {
@@ -335,14 +335,14 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
 	  std::stringstream(temp) >> temp_number;
 	  coordinates.push_back(temp_number);
 	}
-	particle_l_velocity.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+	particle_l_velocity.push_back(ChVector3d(coordinates[0], coordinates[1], coordinates[2]));
       }
       break;
     }
   }
 
   // read particle angular velocity
-  std::vector<ChVector<>> particle_ang_velocity;
+  std::vector<ChVector3d> particle_ang_velocity;
   while (std::getline(vtk_file, line)) {
     if (line.find("ang_velocity") != std::string::npos) {
       for (int i = 0; i < particle_number; ++i) {
@@ -354,7 +354,7 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
 	  std::stringstream(temp) >> temp_number;
 	  coordinates.push_back(temp_number);
 	}
-	particle_ang_velocity.push_back(ChVector<>(coordinates[0], coordinates[1], coordinates[2]));
+	particle_ang_velocity.push_back(ChVector3d(coordinates[0], coordinates[1], coordinates[2]));
       }
       break;
     }
@@ -362,7 +362,7 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   vtk_file.close();
 
   // create particles
-  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  auto material = chrono_types::make_shared<ChContactMaterialSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
@@ -376,29 +376,28 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
   }
   double specimenVol=( CH_C_PI*pow(101.6/2,2)*50.8*2/3- CH_C_PI*pow(69.85/2,2)*50.8/3);
   double density_new = ((density_old * specimenVol) / V_l) * 1e-12;
-  GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
-  GetLog() << "Total volume of particles in container: " << V_l << "\n";
-  GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
+  std::cout << "Recalculation of density. \n Old density: " << density_old << "\n";
+  std::cout << "Total volume of particles in container: " << V_l << "\n";
+  std::cout << "New density: " << density_new << " (should be smaller than old density) \n";
   for (int i = 0; i < particle_number; ++i) {
     if (particle_pos[i].z() > limit || particle_pos[i] < 0 || abs(particle_pos[i].x()) > limit/2 ||
 	abs(particle_pos[i].y()) > limit/2)
       continue;
-    auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+    auto ball = chrono_types::make_shared<ChBody>();
     double mass = (double(4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3)) * density_new;
     ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
-		       chrono::ChVector<>(1, 1, 1));
+		       chrono::ChVector3d(1, 1, 1));
     ball->SetMass(mass);
     ball->SetPos(particle_pos[i]);
-    ball->SetPos_dt(particle_l_velocity[i]);
-    ball->SetWvel_par(particle_ang_velocity[i]);
-    ball->GetCollisionModel()->ClearModel();
+    ball->SetPosDt(particle_l_velocity[i]);
+    ball->SetAngVelParent(particle_ang_velocity[i]);
+    ball->GetCollisionModel()->Clear();
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
-    ball->SetBodyFixed(false);
+    ball->SetFixed(false);
     // ball->SetLimitSpeed(true);
     //ball->SetMaxSpeed(25);
     //ball->SetMaxWvel(25);
-    ball->SetCollide(true);
-    ball->GetCollisionModel()->BuildModel();
+    ball->EnableCollision(true);
 #ifdef IRR
     auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
     sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
@@ -445,9 +444,9 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
       break;
     }
   }
-  GetLog() << "Particle number in the system: " << particle_number << "\n";
+  std::cout << "Particle number in the system: " << particle_number << "\n";
   // read particle positions
-  std::vector<ChVector<>> particle_pos;
+  std::vector<ChVector3d> particle_pos;
   std::string temp;
   float temp_number;
   std::getline(vtk_file_coords, line);  // just to skip one line 
@@ -461,15 +460,15 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
       coordinates.push_back(0.001*temp_number);  // scale to meters
     }
     if (coordinates[0] > 0.15/2){
-      particle_pos.push_back(ChVector<>(coordinates[0] - 0.14/2, coordinates[1] - 0.15/2,
+      particle_pos.push_back(ChVector3d(coordinates[0] - 0.14/2, coordinates[1] - 0.15/2,
 					coordinates[2] + 3.6*0.15));
     }
     else if (coordinates[0] < -0.15/2) {
-      particle_pos.push_back(ChVector<>(coordinates[0] + 0.14/2, coordinates[1] - 0.15/2,
+      particle_pos.push_back(ChVector3d(coordinates[0] + 0.14/2, coordinates[1] - 0.15/2,
 					coordinates[2] + 3.6*0.15));
     }
     else {
-      particle_pos.push_back(ChVector<>(coordinates[0], coordinates[1] - 0.15/2,
+      particle_pos.push_back(ChVector3d(coordinates[0], coordinates[1] - 0.15/2,
 					coordinates[2] + 2*0.15));
     }
   }
@@ -490,7 +489,7 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
   }
 
   // create particles
-  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  auto material = chrono_types::make_shared<ChContactMaterialSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
@@ -508,9 +507,9 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
     V_l += double(4.0 / 3.0) * 3.141592653589793238462 * pow(particle_radiuses[i], 3);
   }
   double density_new = (density_old * 0.15 * 0.15 * 0.15) / V_l;
-  GetLog() << "Recalculation of density. \n Old density: " << density_old << "\n";
-  GetLog() << "Total volume of particles in container: " << V_l << "\n";
-  GetLog() << "New density: " << density_new << " (should be smaller than old density) \n";
+  std::cout << "Recalculation of density. \n Old density: " << density_old << "\n";
+  std::cout << "Total volume of particles in container: " << V_l << "\n";
+  std::cout << "New density: " << density_new << " (should be smaller than old density) \n";
   int particles_in_container = 0;
   for (int i = 0; i < particle_number; ++i) {
     if (limit_heigth)
@@ -518,23 +517,22 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
 	  particle_pos[i] < 0 || abs(particle_pos[i].x()) > height_limit/2 ||
 	  abs(particle_pos[i].y()) > height_limit/2)
 	continue; 
-    auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
+    auto ball = chrono_types::make_shared<ChBody>();
     double mass = (double(4.0 / 3.0) * 3.141592653589793238462 *
 		   pow(particle_radiuses[i], 3)) * density_new;
     ball->SetInertiaXX((2.0 / 5.0)*mass * pow(particle_radiuses[i], 3) * 
-		       chrono::ChVector<>(1, 1, 1));
+		       chrono::ChVector3d(1, 1, 1));
     ball->SetMass(mass);
     ball->SetPos(particle_pos[i]);
-    ball->SetPos_dt(ChVector<>(0, 0, 0));
-    ball->SetWvel_par(ChVector<>(0, 0, 0));
+    ball->SetPosDt(ChVector3d(0, 0, 0));
+    ball->SetAngVelParent(ChVector3d(0, 0, 0));
     //ball->SetLimitSpeed(true);
     //ball->SetMaxSpeed(10);
     //ball->SetMaxWvel(10);
-    ball->GetCollisionModel()->ClearModel();
+    ball->GetCollisionModel()->Clear();
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
-    ball->SetBodyFixed(false);
-    ball->SetCollide(true);
-    ball->GetCollisionModel()->BuildModel();
+    ball->SetFixed(false);
+    ball->EnableCollision(true);
 #ifdef IRR
     auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
     sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
@@ -549,6 +547,6 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
     sys.AddBody(ball);
     ++particles_in_container;
   }
-  GetLog() << "Loaded particles - inside container: " << particles_in_container << "\n";
+  std::cout << "Loaded particles - inside container: " << particles_in_container << "\n";
 }
 #endif

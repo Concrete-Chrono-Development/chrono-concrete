@@ -34,7 +34,7 @@
 #include "chrono/physics/ChSystemSMC.h"
 #include "chrono/physics/ChContactMaterialSMC.h"
 #include "chrono_multicore/solver/ChIterativeSolverMulticore.h"
-
+#include "chrono/core/ChRotation.h"
 #include <thrust/sort.h>
 
 #if defined _WIN32
@@ -704,7 +704,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     // Calculate squared radius of contact surface 
     real H_IJ = Pow(R_I, 2) - Pow(a_I, 2);
     // Calculate area of contact surface H_IJ is already squared
-    real A_IJ = H_IJ * CH_C_PI;
+    real A_IJ = H_IJ * CH_PI;
     // Create vectors to express location of the contact area
     real3 a_I_vec, a_J_vec, a_I_vec_loc, a_J_vec_loc;
     if (R_I != -1 && R_J != -1) {
@@ -757,17 +757,17 @@ void function_CalcDFCForces(int index,               // index of this contact pa
             rotation_axis = real3(0, 0, 0);
         }
         chrono::ChQuaternion<real> transformation_quaternion;
-        transformation_quaternion.Q_from_AngAxis(alfa,
-                                                 chrono::ChVector(rotation_axis.x, rotation_axis.y, rotation_axis.z));
-        auto global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector(1, 0, 0));
+        transformation_quaternion = QuatFromAngleAxis({alfa,
+	    chrono::ChVector3(rotation_axis.x, rotation_axis.y, rotation_axis.z)});
+        auto global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector3(1, 0, 0));
         if (global_normal_direction.x() != e_IJ_N_vec.x || global_normal_direction.y() != e_IJ_N_vec.y ||
             global_normal_direction.z() != e_IJ_N_vec.z) {
             // the difference between calculated global normal direction and vector e_IJ_N_vec results from wrong sign
-            transformation_quaternion.Q_from_AngAxis(-alfa, chrono::ChVector(rotation_axis.x, rotation_axis.y, rotation_axis.z));
-            global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector(1, 0, 0));
+	  transformation_quaternion = QuatFromAngleAxis({-alfa, chrono::ChVector3(rotation_axis.x, rotation_axis.y, rotation_axis.z)});
+            global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector3(1, 0, 0));
         }
-        auto global_tangent_direction1 = transformation_quaternion.Rotate(chrono::ChVector(0, 1, 0));
-        auto global_tangent_direction2 = transformation_quaternion.Rotate(chrono::ChVector(0, 0, 1));
+        auto global_tangent_direction1 = transformation_quaternion.Rotate(chrono::ChVector3(0, 1, 0));
+        auto global_tangent_direction2 = transformation_quaternion.Rotate(chrono::ChVector3(0, 0, 1));
 	real dir1_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(),
 						  global_tangent_direction1.y(),
 						  global_tangent_direction1.z()));
@@ -785,8 +785,8 @@ void function_CalcDFCForces(int index,               // index of this contact pa
 	  e_IJ_ML_vec = real3(0, 0, 0);
 	}
     } else {
-      auto global_tangent_direction1 = chrono::ChVector(0, 1, 0);
-      auto global_tangent_direction2 = chrono::ChVector(0, 0, 1);
+      auto global_tangent_direction1 = chrono::ChVector3(0, 1, 0);
+      auto global_tangent_direction2 = chrono::ChVector3(0, 0, 1);
       real dir1_val = Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(),
 						global_tangent_direction1.y(),
 						global_tangent_direction1.z()));
@@ -1195,14 +1195,16 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
 	    int body1 = data_manager->cd_data->bids_rigid_rigid[i].x;
 	    int body2 = data_manager->cd_data->bids_rigid_rigid[i].y;
             if (data_manager->cd_data->shape_data.typ_rigid[pair.x] == 0) {
-	      temp_R1 = (*data_manager->body_list)[body1]->
-		GetCollisionModel()->GetShapeDimensions(0)[0];
+	      auto temp_shape = (*data_manager->body_list)[body1]->
+		GetCollisionModel()->GetShapeInstance(0).first;
+	      temp_R1 = dynamic_cast<ChCollisionShapeSphere*>(temp_shape.get())->GetRadius();
             } else {
 	      temp_R1 = -1;
             }
             if (data_manager->cd_data->shape_data.typ_rigid[pair.y] == 0) {
-	      temp_R2 = (*data_manager->body_list)[body2]->
-		GetCollisionModel()->GetShapeDimensions(0)[0];
+	      auto temp_shape = (*data_manager->body_list)[body2]->
+		GetCollisionModel()->GetShapeInstance(0).first;
+	      temp_R2 = dynamic_cast<ChCollisionShapeSphere*>(temp_shape.get())->GetRadius();
             } else {
 	      temp_R2 = -1;
             }
