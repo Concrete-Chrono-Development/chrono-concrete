@@ -252,10 +252,10 @@ void read_particles_VTK(ChSystemMulticoreSMC& sys, const std::string& filename) 
     ball->SetFixed(false);
     ball->EnableCollision(true);
 #ifdef IRR
-    auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
+    auto sphere1 = chrono_types::make_shared<ChVisualShapeSphere>(particle_radiuses[i]);
     sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
     sphere1->SetOpacity(0.4f);
-    auto sphere2 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i] - 4e-3);
+    auto sphere2 = chrono_types::make_shared<ChVisualShapeSphere>(particle_radiuses[i] - 4e-3);
     sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
     auto ball_vis = chrono_types::make_shared<ChVisualModel>();
     ball_vis->AddShape(sphere1);
@@ -391,7 +391,6 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
     ball->SetPos(particle_pos[i]);
     ball->SetPosDt(particle_l_velocity[i]);
     ball->SetAngVelParent(particle_ang_velocity[i]);
-    ball->GetCollisionModel()->Clear();
     utils::AddSphereGeometry(ball.get(), material, particle_radiuses[i]);
     ball->SetFixed(false);
     // ball->SetLimitSpeed(true);
@@ -399,10 +398,10 @@ void read_particles_VTK_inside(ChSystemMulticoreSMC& sys, const std::string& fil
     //ball->SetMaxWvel(25);
     ball->EnableCollision(true);
 #ifdef IRR
-    auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
+    auto sphere1 = chrono_types::make_shared<ChVisualShapeSphere>(particle_radiuses[i]);
     sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
     sphere1->SetOpacity(0.4f);
-    auto sphere2 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i] - 4e-3);
+    auto sphere2 = chrono_types::make_shared<ChVisualShapeSphere>(particle_radiuses[i] - 4e-3);
     sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
     auto ball_vis = chrono_types::make_shared<ChVisualModel>();
     ball_vis->AddShape(sphere1);
@@ -534,10 +533,10 @@ void read_particles_VTK_Bahar_files(ChSystemMulticoreSMC& sys,
     ball->SetFixed(false);
     ball->EnableCollision(true);
 #ifdef IRR
-    auto sphere1 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i]);
+    auto sphere1 = chrono_types::make_shared<ChVisualShapeSphere>(particle_radiuses[i]);
     sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
     sphere1->SetOpacity(0.4f);
-    auto sphere2 = chrono_types::make_shared<ChSphereShape>(particle_radiuses[i] - 4e-3);
+    auto sphere2 = chrono_types::make_shared<ChVisualShapeSphere>(particle_radiuses[i] - 4e-3);
     sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
     auto ball_vis = chrono_types::make_shared<ChVisualModel>();
     ball_vis->AddShape(sphere1);

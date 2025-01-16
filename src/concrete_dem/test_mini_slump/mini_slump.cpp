@@ -37,6 +37,7 @@
 #include "chrono/physics/ChLinkMotorLinearForce.h"
 #include "chrono/physics/ChLoadContainer.h"
 #include "chrono/physics/ChLoadsBody.h"
+//#include <ChCollisionShapeTriangleMesh.h>
 
 using namespace chrono;
 using namespace chrono::particlefactory;
@@ -52,9 +53,10 @@ double calc_aggVolFrac(std::vector<std::shared_ptr<ChBody>> &bodylist,
 		       double hlayer, double specimenVol){
   double avfrac = 0;
   for (auto body : bodylist) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType() != 0)
       continue;
-    double radius = body->GetCollisionModel()->GetShapeDimensions(0)[0] - hlayer;
+    auto temp_shape = body->GetCollisionModel()->GetShapeInstance(0).first;
+    double radius = dynamic_cast<ChCollisionShapeSphere*>(temp_shape.get())->GetRadius() - hlayer;
     avfrac += 1.33333333333333333333333 * CH_C_PI * radius * radius * radius;
   }
   return avfrac / specimenVol;
@@ -62,10 +64,10 @@ double calc_aggVolFrac(std::vector<std::shared_ptr<ChBody>> &bodylist,
 
 void delete_particle(ChSystemMulticoreSMC& sys, double limit) {
   std::list<std::shared_ptr<ChBody>> to_delete;
-  for (auto body : sys.Get_bodylist()) {
-    if (body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+  for (auto body : sys.GetBodies()) {
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType())
       continue;
-    ChVector<> pos = body->GetPos();
+    ChVector3d pos = body->GetPos();
     if (pos.z() > limit || pos.z() < 0.0 || abs(pos.x()) > limit/2 || abs(pos.y()) > limit/2){
       to_delete.push_back(body);
     }
@@ -80,10 +82,10 @@ void delete_particle(ChSystemMulticoreSMC& sys, double limit) {
 std::vector<std::shared_ptr<ChBody>> list_particle_for_removal(ChSystemMulticoreSMC& sys, 
 							      double limit) {
   std::vector<std::shared_ptr<ChBody>> to_delete;
-  for (auto body : sys.Get_bodylist()) {
-    if (body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+  for (auto body : sys.GetBodies()) {
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType())
       continue;
-    ChVector<> pos = body->GetPos();
+    ChVector3d pos = body->GetPos();
     if (pos.z() > limit || pos.z() < 0.0 || abs(pos.x()) > limit/2 || abs(pos.y()) > limit/2){
       to_delete.push_back(body);
     }
@@ -113,8 +115,8 @@ private:
 
 
 
-std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVector<> vel, int id){
-  auto material = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector3d pos, ChVector3d vel, int id){
+  auto material = chrono_types::make_shared<ChContactMaterialSMC>();
   material->SetYoungModulus(2.05e11);
   material->SetPoissonRatio(0.3);
   material->SetRestitution(0.5);
@@ -123,23 +125,20 @@ std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVect
   double h = 2;
   double density = 797 * (1 + 0.4 + 2.25)*1e-12;
   double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * density;
-  auto ball = std::shared_ptr<chrono::ChBody>(sys.NewBody());
-  ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector<>(1, 1, 1));
+  auto ball = chrono_types::make_shared<ChBody>();
+  ball->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 3) * chrono::ChVector3d(1, 1, 1));
   ball->SetMass(mass);
-  ball->SetIdentifier(id);
   ball->SetPos(pos);
-  ball->SetPos_dt(vel);
-  ball->SetWvel_par(ChVector<>(0, 0, 0));
-  ball->GetCollisionModel()->ClearModel();
+  ball->SetPosDt(vel);
+  ball->SetAngVelParent(ChVector3d(0, 0, 0));
   utils::AddSphereGeometry(ball.get(), material, radius);
-  ball->SetBodyFixed(false);
-  ball->SetCollide(true);
-  ball->GetCollisionModel()->BuildModel();
+  ball->SetFixed(false);
+  ball->EnableCollision(true);
   #ifdef IRR
-  auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
+  auto sphere1 = chrono_types::make_shared<ChVisualShapeSphere>(radius);
   sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
   sphere1->SetOpacity(0.4f);
-  auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
+  auto sphere2 = chrono_types::make_shared<ChVisualShapeSphere>(radius - h);
   sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
   auto ball_vis = chrono_types::make_shared<ChVisualModel>();
   ball_vis->AddShape(sphere1);
@@ -151,46 +150,44 @@ std::shared_ptr<ChBody> AddSphere(ChSystemMulticore& sys, ChVector<> pos, ChVect
 }
 
 // function printing current energy status
-ChVector<> print_energy_status(ChSystemMulticore& sys){
+ChVector3d print_energy_status(ChSystemMulticore& sys){
   float total_trans_kin_e = 0;
   float total_rot_kin_e = 0;
-  auto body_list = sys.Get_bodylist();
+  auto body_list = sys.GetBodies();
   for (auto body : body_list) {
-    if (body->GetBodyFixed() || body->GetCollisionModel()->GetShape(0)->GetType() != 0)
+    if (body->IsFixed() || body->GetCollisionModel()->GetShapeInstance(0).first->GetType())
       continue;
     auto mass = body->GetMass();
     auto inertia = body->GetInertiaXX();
     float trans_kin_e = 0;  // transnational kinetic energy
     float rot_kin_e = 0;  // rotational kinetic energy
-    ChVector<float> vel_t = body->GetPos_dt();
-    ChVector<float> vel_r = body->GetWvel_par();
+    ChVector3d vel_t = body->GetPosDt();
+    ChVector3d vel_r = body->GetAngVelParent();
     trans_kin_e = 0.5 * mass * (pow(vel_t.x(), 2) + pow(vel_t.y(), 2) + pow(vel_t.z(), 2));
     rot_kin_e = 0.5 * (inertia.x()*pow(vel_r.x(), 2) + inertia.y()*pow(vel_r.y(), 2)
 		       + inertia.z()*pow(vel_r.z(), 2));
     total_trans_kin_e += trans_kin_e;
     total_rot_kin_e += rot_kin_e;
   }
-  GetLog() << "Total transnational kinetic energy: " << total_trans_kin_e;
-  GetLog() << " Total rotational kinetic energy: " << total_rot_kin_e << "\n";
-  return ChVector<>(total_trans_kin_e, total_rot_kin_e, 0);
+  std::cout << "Total transnational kinetic energy: " << total_trans_kin_e;
+  std::cout << " Total rotational kinetic energy: " << total_rot_kin_e << "\n";
+  return ChVector3d(total_trans_kin_e, total_rot_kin_e, 0);
 }
 
 std::shared_ptr<ChBody> create_floor_body(ChSystemMulticore& sys){
-  auto mat = chrono_types::make_shared<chrono::ChMaterialSurfaceSMC>();
+  auto mat = chrono_types::make_shared<chrono::ChContactMaterialSMC>();
   mat->SetYoungModulus(1e2);
   mat->SetPoissonRatio(0.3);
   mat->SetRestitution(0.0);
   mat->SetFriction(0.5);
   mat->SetAdhesion(0.0);
-  auto floor_body = std::shared_ptr<ChBody>(sys.NewBody());
+  auto floor_body = chrono_types::make_shared<ChBody>();
   floor_body->SetMass(1);
-  floor_body->SetInertiaXX(ChVector<>(1, 1, 1));
-  floor_body->SetPos(ChVector<>(0, -5, 0));
-  floor_body->SetBodyFixed(true);
-  floor_body->SetCollide(true);
-  floor_body->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(floor_body.get(), mat, ChVector<>(400, 10, 400));
-  floor_body->GetCollisionModel()->BuildModel();
+  floor_body->SetInertiaXX(ChVector3d(1, 1, 1));
+  floor_body->SetPos(ChVector3d(0, -5, 0));
+  floor_body->SetFixed(true);
+  floor_body->EnableCollision(true);
+  utils::AddBoxGeometry(floor_body.get(), mat, ChVector3d(400, 10, 400));
   floor_body->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
   floor_body->GetVisualShape(0)->SetOpacity(0.2f);
   sys.AddBody(floor_body);
@@ -198,85 +195,87 @@ std::shared_ptr<ChBody> create_floor_body(ChSystemMulticore& sys){
 }
 
 std::shared_ptr<ChBody> AddConicalContainer(ChSystemMulticoreSMC& sys,
-					    std::shared_ptr<ChMaterialSurface> mat,
+					    std::shared_ptr<ChContactMaterial> mat,
 					    double density, double radius,
 					    double height,
 					    std::string current_dir) {    // create cylinder
   const std::string path = current_dir + "minislump-Cut4.obj";
-  auto cylinder = std::shared_ptr<ChBody>(sys.NewBody());
+  auto cylinder = chrono_types::make_shared<ChBody>();
   cylinder->SetMass(0.0004567);  // in tones
-  cylinder->SetInertiaXX(ChVector<>(1, 1, 1));
-  cylinder->SetCollide(true);
-  cylinder->SetBodyFixed(false);
-  auto trimesh = geometry::ChTriangleMeshConnected::CreateFromWavefrontFile(path);
-  cylinder->GetCollisionModel()->ClearModel();
-  cylinder->GetCollisionModel()->AddTriangleMesh(mat, trimesh, true, true,
-						 ChVector<>(0), ChMatrix33<>(1), 5);
-  cylinder->GetCollisionModel()->BuildModel();
-  auto trimesh_shape = chrono_types::make_shared<ChTriangleMeshShape>();
+  cylinder->SetInertiaXX(ChVector3d(1, 1, 1));
+  cylinder->EnableCollision(true);
+  cylinder->SetFixed(false);
+  auto trimesh = ChTriangleMeshConnected::CreateFromWavefrontFile(path);
+  auto trimesh_collision = chrono_types::make_shared
+    <ChCollisionShapeTriangleMesh>(mat, trimesh, true, true, 5);
+  cylinder->GetCollisionModel()->Clear();
+  cylinder->GetCollisionModel()->AddShape(trimesh_collision,
+					  ChFrame<>(ChVector3d(0), QUNIT));
+  auto trimesh_shape = chrono_types::make_shared<ChVisualShapeTriangleMesh>();
   trimesh_shape->SetMesh(trimesh);
   trimesh_shape->SetName("Container 1");
   cylinder->AddVisualShape(trimesh_shape);
-  ChQuaternion<> q=Q_from_AngAxis(CH_C_PI_2, VECT_X); //mini slump
+  ChQuaternion<> q = QuatFromAngleAxis(CH_C_PI_2, VECT_X); //mini slump
   cylinder->SetRot(q);
-  std::cout << "COG: " << cylinder->GetFrame_COG_to_abs().GetPos() << std::endl;
-  cylinder->SetPos(ChVector<>(0,59,0));
+  std::cout << "COG: " << cylinder->GetFrameCOMToAbs().GetPos() << std::endl;
+  cylinder->SetPos(ChVector3d(0,59,0));
   sys.AddBody(cylinder);
   return cylinder;		
 }
 
 std::shared_ptr<ChBody> AddConicalContainer2(ChSystemMulticoreSMC& sys,
-					     std::shared_ptr<ChMaterialSurface> mat,
+					     std::shared_ptr<ChContactMaterial> mat,
 					     double density, double radius,
 					     double height,
 					     std::string current_dir
 					     ) {    // create cylinder 
   const std::string path = current_dir + "minislump-Cut4.obj";
-  auto cylinder = std::shared_ptr<ChBody>(sys.NewBody());
+  auto cylinder = chrono_types::make_shared<ChBody>();
   cylinder->SetMass(1);
-  cylinder->SetInertiaXX(ChVector<>(1, 1, 1));
-  cylinder->SetCollide(true);
-  cylinder->SetBodyFixed(false);
-  auto trimesh = geometry::ChTriangleMeshConnected::CreateFromWavefrontFile(path);
-  cylinder->GetCollisionModel()->ClearModel();
-  cylinder->GetCollisionModel()->AddTriangleMesh(mat, trimesh, true, true,
-						 ChVector<>(0), ChMatrix33<>(1), 5);
-  cylinder->GetCollisionModel()->BuildModel();
-  auto trimesh_shape = chrono_types::make_shared<ChTriangleMeshShape>();
+  cylinder->SetInertiaXX(ChVector3d(1, 1, 1));
+  cylinder->EnableCollision(true);
+  cylinder->SetFixed(false);
+  auto trimesh = ChTriangleMeshConnected::CreateFromWavefrontFile(path);
+  auto trimesh_collision = chrono_types::make_shared
+    <ChCollisionShapeTriangleMesh>(mat, trimesh, true, true, 5);
+  cylinder->GetCollisionModel()->Clear();
+  cylinder->GetCollisionModel()->AddShape(trimesh_collision,
+					  ChFrame<>(ChVector3d(0), QUNIT));
+  auto trimesh_shape = chrono_types::make_shared<ChVisualShapeTriangleMesh>();
+
   trimesh_shape->SetMesh(trimesh);
   trimesh_shape->SetName("Container 1");
   cylinder->AddVisualShape(trimesh_shape);
 
-  ChQuaternion<> q=Q_from_AngAxis(CH_C_PI_2, -VECT_X); //mini slump
+  ChQuaternion<> q = QuatFromAngleAxis({CH_C_PI_2, -VECT_X}); //mini slump
   cylinder->SetRot(q);
-  std::cout << "COG: " << cylinder->GetFrame_COG_to_abs().GetPos() << std::endl;
-  cylinder->SetPos(ChVector<>(0,(50.8 - 22.3) + 50.8 + 3,0));
-  cylinder->SetBodyFixed(true);
+  std::cout << "COG: " << cylinder->GetFrameCOMToAbs().GetPos() << std::endl;
+  cylinder->SetPos(ChVector3d(0,(50.8 - 22.3) + 50.8 + 3,0));
+  cylinder->SetFixed(true);
   sys.AddBody(cylinder); 
   return cylinder;		
 }
 
 std::shared_ptr<ChBody> create_obstacle_body(ChSystemMulticore& sys){
-  auto mat = chrono_types::make_shared<chrono::ChMaterialSurfaceSMC>();
+  auto mat = chrono_types::make_shared<chrono::ChContactMaterialSMC>();
   mat->SetYoungModulus(1e2);
   mat->SetPoissonRatio(0.3);
   mat->SetRestitution(0.0);
   mat->SetFriction(0.5);
   mat->SetAdhesion(0.0);
-  auto obstacle_body = std::shared_ptr<ChBody>(sys.NewBody());
+  auto obstacle_body = chrono_types::make_shared<ChBody>();
   obstacle_body->SetMass(1);
-  obstacle_body->SetInertiaXX(ChVector<>(1, 1, 1));
-  obstacle_body->SetPos(ChVector<>(0, 23, 0));
-  obstacle_body->SetBodyFixed(true);
-  obstacle_body->SetCollide(true);
-  obstacle_body->GetCollisionModel()->ClearModel();
-  utils::AddBoxGeometry(obstacle_body.get(), mat, ChVector<>(120, 3, 120));
-  obstacle_body->GetCollisionModel()->BuildModel();
+  obstacle_body->SetInertiaXX(ChVector3d(1, 1, 1));
+  obstacle_body->SetPos(ChVector3d(0, 23, 0));
+  obstacle_body->SetFixed(true);
+  obstacle_body->EnableCollision(true);
+  obstacle_body->GetCollisionModel()->Clear();
+  utils::AddBoxGeometry(obstacle_body.get(), mat, ChVector3d(120, 3, 120));
   obstacle_body->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/concrete.jpg"));
   obstacle_body->GetVisualShape(0)->SetOpacity(1.0f);
-  obstacle_body->SetBodyFixed(true);
+  obstacle_body->SetFixed(true);
   obstacle_body->GetCollisionModel()->SetFamilyGroup(2);
-  obstacle_body->GetCollisionModel()->SetFamilyMaskNoCollisionWithFamily(1);
+  obstacle_body->GetCollisionModel()->DisallowCollisionsWith(1);
   sys.AddBody(obstacle_body);
   return obstacle_body;
 }
@@ -287,7 +286,7 @@ void ReadDFCparticles(ChSystem& sys, std::string& data_path, std::string& file_n
 		      ,std::shared_ptr<ChVisualSystemIrrlicht>& vis
 		      #endif
 		      ) {
-  auto mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  auto mat = chrono_types::make_shared<ChContactMaterialSMC>();
   mat->SetYoungModulus(1e2); //2e3
   mat->SetFriction(0.5);
   mat->SetRestitution(0.0f);
@@ -321,33 +320,31 @@ void ReadDFCparticles(ChSystem& sys, std::string& data_path, std::string& file_n
       particles.push_back(temp);
     }
   }	
-  Quaternion q=Q_from_AngAxis(-CH_C_PI_2, VECT_X);
-  ChVector<> t(0,0,0);
-  chrono::Coordsys csys(t, q);
+  ChQuaterniond q = QuatFromAngleAxis(-CH_C_PI_2, VECT_X);
+  ChVector3d t(0,0,0);
+  chrono::ChCoordsysd csys(t, q);
   for (auto particle:particles) {
     float x_pos=particle.x;
     float y_pos=particle.y;
     float z_pos=particle.z;
-    ChVector<> pos={x_pos, y_pos, z_pos+3};            
-    ChVector<> rotatedpos=csys.TransformLocalToParent(pos);
+    ChVector3d pos={x_pos, y_pos, z_pos+3};            
+    ChVector3d rotatedpos=csys.TransformPointLocalToParent(pos);
     std::cout<<"pos: "<<pos<<"\t";
     std::cout<<"rotated pos: "<<rotatedpos<<"\n";
     double radius=particle.d/2+h_layer;
     double mass = rho/2*4/3*pow(radius, 3)*CH_C_PI;		
-    auto body = std::shared_ptr<ChBody>(sys.NewBody());;
-    body->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 2) * ChVector<>(1, 1, 1));
+    auto body = chrono_types::make_shared<ChBody>();;
+    body->SetInertiaXX((2.0 / 5.0) * mass * pow(radius, 2) * ChVector3d(1, 1, 1));
     body->SetMass(mass);
     body->SetPos(rotatedpos);
-    body->GetCollisionModel()->ClearModel();
-    body->GetCollisionModel()->AddSphere(mat, radius);
-    body->GetCollisionModel()->BuildModel();
-    body->SetCollide(true);
+    utils::AddSphereGeometry(body.get(), mat, radius);
+    body->EnableCollision(true);
     #ifdef IRR
-    auto sphereMor = chrono_types::make_shared<ChSphereShape>(radius);
+    auto sphereMor = chrono_types::make_shared<ChVisualShapeSphere>(radius);
     sphereMor->SetColor(ChColor(128.f/255, 128.f/255, 128.f/255));
     sphereMor->SetOpacity(0.25f);
     body->AddVisualShape(sphereMor);			
-    auto sphereAgg = chrono_types::make_shared<ChSphereShape>(radius-h_layer);
+    auto sphereAgg = chrono_types::make_shared<ChVisualShapeSphere>(radius-h_layer);
     sphereAgg->SetColor(ChColor(5.f/255, 48.f/255, 173.f/255));	
     body->AddVisualShape(sphereAgg);
     vis->BindItem(body);
@@ -362,16 +359,16 @@ void ReadDFCparticles(ChSystem& sys, std::string& data_path, std::string& file_n
 
 
 int main(int argc, char* argv[]) {
-  GetLog() << "Test application for implementation of DFC model in chrono::multicore\n";
-  GetLog() << "Based on open source library projectchrono.org Chrono version: "
+  std::cout << "Test application for implementation of DFC model in chrono::multicore\n";
+  std::cout << "Based on open source library projectchrono.org Chrono version: "
 	   << CHRONO_VERSION << "\n";
   chrono::SetChronoDataPath(CHRONO_DATA_DIR);
-  std::string out_dir = "OUT_VTK_mini_slump_third_set";
+  std::string out_dir = "OUT_VTK_mini_slump_verification_simulation";
   if (!filesystem::create_directory(filesystem::path(out_dir))) {
     std::cerr << "Error creating directory" << out_dir << std::endl;
     return 1;
   }
-  std::string terminal_log_file = out_dir + "/Mini_slump_Set_3_terminal_log.txt";
+  std::string terminal_log_file = out_dir + "/Mini_slump_verification_simulation_terminal_log.txt";
   std::ofstream terminal_file(terminal_log_file);
   terminal_file << "Test application for implementation of DFC model in chrono::multicore\n";
   terminal_file << "Based on open source library projectchrono.org Chrono version: "
@@ -380,8 +377,8 @@ int main(int argc, char* argv[]) {
   int pos = current_dir.find_last_of("/\\");
   current_dir = current_dir.substr(0, pos+1);
   ChSystemMulticoreSMC sys;
-  sys.Set_G_acc(ChVector<>(0, -9810, 0));
-
+  sys.SetGravitationalAcceleration(ChVector3d(0, -9810, 0));
+  sys.SetCollisionSystemType(ChCollisionSystem::Type::MULTICORE);
   // concrete and DFC parameters (SI units)
   double specimenVol=( CH_C_PI*pow(101.6/2,2)*50.8*2/3- CH_C_PI*pow(69.85/2,2)*50.8/3);
   double Vol=specimenVol;
@@ -426,10 +423,10 @@ int main(int argc, char* argv[]) {
   sys.GetSettings()->dfc_contact_param.t = h_layer/2;
   sys.GetSettings()->dfc_contact_param.debug_verbose = false;
   sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
-  sys.GetSettings()->collision.narrowphase_algorithm = collision::ChNarrowphase::Algorithm::HYBRID;
+  sys.GetSettings()->collision.narrowphase_algorithm = ChNarrowphase::Algorithm::HYBRID;
 
   auto floor_body = create_floor_body(sys);
-  auto mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+  auto mat = chrono_types::make_shared<ChContactMaterialSMC>();
   mat->SetYoungModulus(1e8);
   mat->SetFriction(0.5);
   mat->SetRestitution(0.0f);
@@ -468,20 +465,20 @@ int main(int argc, char* argv[]) {
   #ifdef IRR
   std::shared_ptr<ChVisualSystem> vis;
   auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
-  ReadDFCparticles(sys, data_path, file_name, rho, h_layer,  vis_irr);
+  //  ReadDFCparticles(sys, data_path, file_name, rho, h_layer,  vis_irr);
   vis_irr->AttachSystem(&sys);
   vis_irr->SetWindowSize(800, 600);
   vis_irr->SetWindowTitle("SMC callbacks");
   vis_irr->Initialize();
   vis_irr->AddLogo();
   vis_irr->AddSkyBox();
-  vis_irr->AddCamera(ChVector<>(200, 200, -300));
+  vis_irr->AddCamera(ChVector3d(20, 20, -30));
   vis_irr->AddTypicalLights();
   vis = vis_irr;
   #endif
   #ifndef IRR
   //ReadDFCparticles(sys, data_path, file_name, rho, h_layer);
-  //auto ball =  AddSphere(sys, ChVector<>(0, 6, 0), ChVector<>(0, -1500, 0), 1);
+  //auto ball =  AddSphere(sys, ChVector3d(0, 6, 0), ChVector3d(0, -1500, 0), 1);
   //  std::vector<vec2> pair_to_debug;
   //  pair_to_debug.push_back(vec2(floor_body->GetId(), cylinder_body->GetId()));
   //  sys.GetSettings()->dfc_contact_param.debug_contact_pairs = pair_to_debug;
@@ -490,7 +487,7 @@ int main(int argc, char* argv[]) {
   while (vis->Run()) {
     vis->BeginScene();
     vis->Render();
-    vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
+    //    vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);
     vis->EndScene();
 #else
   while (continue_simulation) {
@@ -499,9 +496,9 @@ int main(int argc, char* argv[]) {
     ChQuaternion<> q=Q_from_AngAxis(CH_C_PI_2, VECT_X); //mini slump
     cylinder_body->SetRot(q);
     double y = cylinder_body->GetPos().y();
-    cylinder_body->SetPos(ChVector<>(0, y, 0));
+    cylinder_body->SetPos(ChVector3d(0, y, 0));
     if (cylinder_body->GetPos().y() < 52) {
-	cylinder_body->SetPos(ChVector<>(0, 52.0, 0));
+	cylinder_body->SetPos(ChVector3d(0, 52.0, 0));
 	}*/
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
@@ -510,19 +507,19 @@ int main(int argc, char* argv[]) {
 	std::string file_name = out_dir + generate_file_name("/particle_time_steps", saved_steps);
 	write_particles_VTK(sys, file_name);
 	++saved_steps;
-	GetLog() << "Simulation is running. Data saved. Current time step: " << simulation_time << "\n";
+	std::cout << "Simulation is running. Data saved. Current time step: " << simulation_time << "\n";
 	terminal_file << "Simulation is running. Current time step: " << simulation_time << "\n";
       }
     }
     if (std::fmod(step_num, 1000) == 0){
-      ChVector<> temp_energy(print_energy_status(sys));
+      ChVector3d temp_energy(print_energy_status(sys));
       terminal_file << "Total translation kinetic energy: " << temp_energy.x(); // 
       terminal_file << " Total rotational kinetic energy: " << temp_energy.y() << "\n";
-      GetLog() << "Simulation is running. Current time step: " << simulation_time << "\n";
+      std::cout << "Simulation is running. Current time step: " << simulation_time << "\n";
       /*
-      GetLog() << "Current position of cylinder body: " << cylinder_body->GetPos() << "\n";
-      GetLog() << "Current velocity of cylinder body: " << cylinder_body->GetPos_dt() << "\n";
-      GetLog() << "Current rotation of cylinder body: " << cylinder_body->GetRot() << "\n";
+      std::cout << "Current position of cylinder body: " << cylinder_body->GetPos() << "\n";
+      std::cout << "Current velocity of cylinder body: " << cylinder_body->GetPos_dt() << "\n";
+      std::cout << "Current rotation of cylinder body: " << cylinder_body->GetRot() << "\n";
       terminal_file << "Current position of cylinder body: " << cylinder_body->GetPos() << "\n";
       terminal_file << "Current velocity of cylinder body: " << cylinder_body->GetPos_dt() << "\n";
       */
