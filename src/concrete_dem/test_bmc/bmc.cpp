@@ -147,7 +147,7 @@ std::shared_ptr<ChBodyAuxRef> CreateBMCrod(ChSystemMulticoreSMC& sysMBS,
     bmcRod->SetMass(mmass*density_steel);
     bmcRod->SetInertia(principal_I*density_steel);
     std::cout << " principal_I : " << bmcRod->GetInertia() << " mass : "
-	      << bmcRod->GetMass() << std::endl;
+	      << bmcRod->GetMass() << bmcRod->GetPos() << std::endl;
     return bmcRod;
 }
 
@@ -172,7 +172,7 @@ std::shared_ptr<ChBody> AddBMCContainer(ChSystemMulticoreSMC& sys,
 							     );
   ChQuaternion<> q=QuatFromAngleAxis(CH_PI_2, VECT_Z);
   container->SetRot(q);
-  container->SetPos(ChVector3d(0,0,0));	
+  //  container->SetPos(ChVector3d(0,0,0));	
   //container->GetVisualShape(0)->GetMaterial(0)->SetOpacity(0.5);
   //container->SetFixed(true);	
   sys.AddBody(container); 
@@ -200,7 +200,7 @@ std::shared_ptr<ChBody> AddBMCLid(ChSystemMulticoreSMC& sys,
 						       );	
   //ChQuaternion<> q=QuatFromAngleAxis(CH_PI_2, VECT_Z);
   //lid->SetRot(q);
-  lid->SetPos(ChVector3d(0,60,0));
+  //lid->SetPos(ChVector3d(0,60,0));
   //container->GetVisualShape(0)->GetMaterial(0)->SetOpacity(0.5);
   lid->SetFixed(true);	
   sys.AddBody(lid); 		
@@ -318,9 +318,9 @@ void AddFallingItems(ChSystem& sys,
   
   std::vector<chrono::ChVector3<float>> body_points;
   std::vector<chrono::ChVector3<float>> body_points_new;
-  
   std::string nodesFilename=data_path+file_name+"_coords.dat";
-  std::ifstream nodesFile(nodesFilename);   
+  std::ifstream nodesFile(nodesFilename);
+  float shift_in_y_direction = 27;  // read particles were below container, shift by this value
   try {
     chrono::ChVector3d pos;
     double x, y, z;       	
@@ -369,7 +369,7 @@ void AddFallingItems(ChSystem& sys,
     if ((y_pos>60 || y_pos<-27) || (x_pos*x_pos+z_pos*z_pos)>30.*30.)
       continue; 
     body_points_new[ii]=body_points[i];
-    ChVector3d pos={x_pos, y_pos, z_pos};            
+    ChVector3d pos={x_pos, y_pos+shift_in_y_direction, z_pos};            
     ii++;
     double radius=body_radius[i];
     double mass = rho/2*4/3*pow(radius, 3)*CH_PI;           
@@ -463,7 +463,6 @@ int main(int argc, char* argv[]) {
 			    vis,
 			    #endif
 			    floorBody, current_dir);
-  bmcRod->SetPos(ChVector3d(0,-35,0));
   bmcRod->GetCollisionModel()->SetFamilyGroup(2);
   bmcRod->GetCollisionModel()->DisallowCollisionsWith(1);
   bmcRod->EnableCollision(true);
@@ -538,6 +537,20 @@ int main(int argc, char* argv[]) {
 				 #endif
 				 particle_coords, particle_radii, false, 1);
   */
+  // Create the linear motor
+  //	
+  auto motor = chrono_types::make_shared<ChLinkMotorRotationSpeed>();
+  motor->SetName("engine_bmcRod_bmcShaft");
+  motor->Initialize(bmcRod,
+		    rodRefBody,
+		    ChFrame<>(bmcRod->GetPos(), 
+			      chrono::QuatFromAngleAxis(CH_PI / 2.0, VECT_X))); //Rotate on Y Axis
+  auto f_sequence1 = chrono_types::make_shared<ChFunctionSequence>();
+  f_sequence1->InsertFunct(chrono_types::make_shared<ChFunctionConst>(0), 0.5, 1, true);
+  f_sequence1->InsertFunct(chrono_types::make_shared<ChFunctionRamp>(0,1.0472/60), 60., 1, true);
+  motor->SetSpeedFunction(f_sequence1);
+  sys.AddLink(motor);
+  
   double simulation_time = 0;
   double time_step = 1e-06;
   // time interval for data storage expressed in simulation steps
@@ -550,15 +563,21 @@ int main(int argc, char* argv[]) {
   #ifdef IRR
   vis->AttachSystem(&sys);
   while (vis->Run()) {
-    //if (std::fmod(step_num, 1000) ==0) {
+    if (std::fmod(step_num, 10) ==0) {
       vis->BeginScene();
       vis->Render();
       vis->EndScene();
-      // }
+    }
   #else
   while (continue_simulation) {
   #endif
-    // sys.DoStepDynamics(time_step);
+    std::cout << "bmcRod position: " << bmcRod->GetPos() << "\n";
+    //    std::cout << "bmcLid: " << bmcLid->GetPos() << "\n";
+    //std::cout << "bmcRod: " << bmcRod->GetPos() << "\n";
+    sys.DoStepDynamics(time_step);
+     std::cout << "bmcRod position: " << bmcRod->GetPos() << "\n";
+     //std::cout << "bmcLid: " << bmcLid->GetPos() << "\n";
+     //std::cout << "bmcRod: " << bmcRod->GetPos() << "\n";
     simulation_time += time_step;
     std::cout << "Current time step: " << simulation_time << "\n";
     std::cout << "System total kinetic energy: " << calculateKE(sys) << "\n";
