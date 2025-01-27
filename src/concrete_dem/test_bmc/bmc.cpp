@@ -428,7 +428,7 @@ int main(int argc, char* argv[]) {
   vis->AddLogo();
   vis->AddSkyBox();
   vis->AddTypicalLights();
-  vis->AddCamera(ChVector3d(0, 170, -100));
+  vis->AddCamera(ChVector3d(0, 185, -120));
   #endif
 
   // Create the floor:
@@ -563,24 +563,31 @@ int main(int argc, char* argv[]) {
   #ifdef IRR
   vis->AttachSystem(&sys);
   while (vis->Run()) {
-    if (std::fmod(step_num, 10) ==0) {
+    if (std::fmod(step_num, 1000) ==0) {
       vis->BeginScene();
       vis->Render();
+      std::cout << "Check if I am updating the visualistation";
+      std::string screen_file;
+      screen_file += std::string("/home/mariusz/PROJECT_CHRONO/BUILD_DEBUG/src/") +
+	std::string("concrete_dem/test_bmc/OUT_VTK_bmc_first_test/Pictures/screen_step") +
+	std::to_string(step_num) + std::string(".png");
+      std::cout << screen_file << std::endl;
+      vis->WriteImageToFile(screen_file);
       vis->EndScene();
     }
   #else
   while (continue_simulation) {
   #endif
-    std::cout << "bmcRod position: " << bmcRod->GetPos() << "\n";
-    //    std::cout << "bmcLid: " << bmcLid->GetPos() << "\n";
-    //std::cout << "bmcRod: " << bmcRod->GetPos() << "\n";
     sys.DoStepDynamics(time_step);
-     std::cout << "bmcRod position: " << bmcRod->GetPos() << "\n";
-     //std::cout << "bmcLid: " << bmcLid->GetPos() << "\n";
-     //std::cout << "bmcRod: " << bmcRod->GetPos() << "\n";
     simulation_time += time_step;
-    std::cout << "Current time step: " << simulation_time << "\n";
-    std::cout << "System total kinetic energy: " << calculateKE(sys) << "\n";
+    if (std::fmod(step_num, 1000) == 0) {
+      std::cout << "Current time step: " << simulation_time << "\n";
+      std::cout << "System total kinetic energy: " << calculateKE(sys) << "\n";
+      std::cout << "bmcRod angular velocity: " << bmcRod->GetAngVelParent() << "\n";
+      terminal_file << "Current time step: " << simulation_time << "\n";
+      terminal_file << "System total kinetic energy: " << calculateKE(sys) << "\n";
+      terminal_file << "bmcRod angular velocity: " << bmcRod->GetAngVelParent() << "\n";
+    }
     if (simulation_time > 4.5)
       #ifdef IRR
       break;
