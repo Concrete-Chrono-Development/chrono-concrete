@@ -560,10 +560,20 @@ int main(int argc, char* argv[]) {
   bool register_data = true;
   int step_num = 0;
   bool continue_simulation = true;
+
+  FILE *fptr;
+  auto outfilename = out_dir + "/history.txt";
+  fptr= fopen(outfilename.c_str(), "w");
+  fprintf(fptr,"time\t");
+  fprintf(fptr,"Rod x\t Rod y\t Rod z\t");
+  fprintf(fptr,"Motor wx\t Motor wy\t Motor wz\t");
+  fprintf(fptr,"Rod wx\t Rod wy\t Rod wz\t");
+  fprintf(fptr,"Motor Tx\t Motor Ty\t Motor Tz\n");
+  
   #ifdef IRR
   vis->AttachSystem(&sys);
   while (vis->Run()) {
-    if (std::fmod(step_num, 1000) ==0) {
+    if (std::fmod(step_num, 10000) ==0) {
       vis->BeginScene();
       vis->Render();
       std::cout << "Check if I am updating the visualistation";
@@ -581,14 +591,24 @@ int main(int argc, char* argv[]) {
     sys.DoStepDynamics(time_step);
     simulation_time += time_step;
     if (std::fmod(step_num, 1000) == 0) {
+      auto current_energy = calculateKE(sys);
       std::cout << "Current time step: " << simulation_time << "\n";
-      std::cout << "System total kinetic energy: " << calculateKE(sys) << "\n";
+      std::cout << "System total kinetic energy: " << current_energy << "\n";
       std::cout << "bmcRod angular velocity: " << bmcRod->GetAngVelParent() << "\n";
       terminal_file << "Current time step: " << simulation_time << "\n";
-      terminal_file << "System total kinetic energy: " << calculateKE(sys) << "\n";
+      terminal_file << "System total kinetic energy: " << current_energy << "\n";
       terminal_file << "bmcRod angular velocity: " << bmcRod->GetAngVelParent() << "\n";
+      ChVector3d w_pos = bmcRod->GetPos();
+      ChVector3d w_vel = motor->GetMotorAngleDt();
+      ChVector3d angvel = bmcRod->GetAngVelLocal();
+      ChVector3d torque = motor->GetMotorTorque(); 
+      fprintf(fptr, " %10.6f\t ", sys.GetChTime() );
+      fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", w_pos.x(), w_pos.y(), w_pos.z() );
+      fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", w_vel.x(), w_vel.y(), w_vel.z() );
+      fprintf(fptr, " %10.6f %10.6f  %10.6f\t ", angvel.x(), angvel.y(), angvel.z() );
+      fprintf(fptr, " %10.6f %10.6f  %10.6f\n ", torque.x(), torque.y(), torque.z() );
     }
-    if (simulation_time > 4.5)
+    if (simulation_time > 60)
       #ifdef IRR
       break;
       #else
