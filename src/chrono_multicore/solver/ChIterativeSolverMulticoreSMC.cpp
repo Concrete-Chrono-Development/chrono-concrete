@@ -43,6 +43,32 @@
 
 using namespace chrono;
 
+//------------------------------------------------------------------------------
+// Support functions used for implementation of flocculation parameter for
+// DFC (Discrete Fresh Concrete) model.
+//------------------------------------------------------------------------------
+template<typename T>
+T rungeKutta4(std::function<T(T, T, T, T, T, T)> f,
+	      T y0, T t0, T beta, T gammadot, T m, T Tcr, T h, int steps) {    
+  T t = t0;
+  T y = y0;
+  h=h/steps;	
+  for (int i = 0; i < steps; ++i) {
+    T f1 = h * f(t, y, beta, gammadot, m, Tcr);
+    T f2 = h * f(t + h / 2, y + f1 / 2, beta, gammadot, m, Tcr);
+    T f3 = h * f(t + h / 2, y + f2 / 2, beta, gammadot, m, Tcr);
+    T f4 = h * f(t + h, y + f3, beta, gammadot, m, Tcr);
+
+    y = y + (f1 + 2 * f2 + 2 * f3 + f4) / 6;
+    t = t + h;
+  }   
+  return y;
+}
+
+double dfloc(double t, double y, double beta, double gammadot,  double m=0, double T=300.){ 
+  return (1./T/pow(y,m) -beta*gammadot*y);
+}
+
 // -----------------------------------------------------------------------------
 // Main worker function for calculating contact forces. Calculates the contact
 // force and torque for the contact pair identified by 'index' and stores them
@@ -619,6 +645,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real t;
     /// flocculation parameter
     real lambda;
+    real floc_beta;
+    real floc_m;
+    real floc_tcr;
     if (radiuses[index].x != -1 && radiuses[index].y != -1) {   // both contacting shapes are spheres
         E_Nm = param.E_Nm;
         E_Na = param.E_Na;
@@ -633,6 +662,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         mi_a = param.mi_a;
         t = 0;
 	lambda = param.lambda;
+	floc_beta = param.floc_beta;
+	floc_m = param.floc_m;
+	floc_tcr = param.floc_tcr;
     } else {  // any of the contacting shapes is not a sphere
         E_Nm = param.E_Nm_s;
         E_Na = param.E_Na_s;
@@ -647,8 +679,13 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         mi_a = param.mi_a_s;
         t = param.t;
 	lambda = param.lambda;
+	floc_beta = param.floc_beta;
+	floc_m = param.floc_m;
+	floc_tcr = param.floc_tcr;
+
     }
     bool debug_verbose = param.debug_verbose;
+    bool floc_on_flag = param.floc_on_flag;
     std::vector<vec2> debug_contact_pairs = param.debug_contact_pairs;
     
     // Identify the two shapes in contact (global shape IDs).
@@ -805,36 +842,6 @@ void function_CalcDFCForces(int index,               // index of this contact pa
       }
     }
     
-    // Calculate strain rates
-    real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
-    // dot product was introduced to get sign for epsilon_IJ_ML_dt, it is relevant for stiffness
-    // stress at hard contact epsilon_N < -epsilon_a
-    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;
-
-    // Calculate gamma0 prim
-    real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
-
-    // Calculate gamma prim
-    real gamma_dt = Sqrt(beta * Pow(epsilon_IJ_N_dt, 2) + Pow(Length(u_IJ_ML_dt_vec) / l_IJ, 2));
-
-    // Calculate eta_gamma prim
-    // continuous implementation for flocculation parameter 
-    real eta_gamma_dt  = 0;
-    real g_lambda = 1;
-    if (gamma_dt != 0) {
-      eta_gamma_dt = (1 - exp(-Abs(gamma_dt)/gamma_0_dt)) *
-	(sigma_tau0 * (1 + lambda) / Abs(gamma_dt) + eta_inf * g_lambda);
-    } else {
-      eta_gamma_dt = sigma_tau0 * (1 + lambda) / gamma_0_dt; 
-    }
-    
-    // Calculate viscous stresses
-    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
-    //real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
-    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
-
-
-
     // Calculate epsilon_N
     real epsilon_N;
     if (R_I != -1 && R_J != -1) {
@@ -888,8 +895,52 @@ void function_CalcDFCForces(int index,               // index of this contact pa
             }
         }
     
-    // calculate stiffness stresses
+    // Calculate strain rates
     int ctSaveId = max_shear * body_I + contact_id;
+    real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
+    // dot product was introduced to get sign for epsilon_IJ_ML_dt, it is relevant for stiffness
+    // stress at hard contact epsilon_N < -epsilon_a
+    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;
+
+    // Calculate gamma0 prim
+    real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
+
+    // Calculate gamma prim
+    real gamma_dt = Sqrt(beta * Pow(epsilon_IJ_N_dt, 2) + Pow(Length(u_IJ_ML_dt_vec) / l_IJ, 2));
+
+    // Calculate eta_gamma prim
+    // continuous implementation for flocculation parameter 
+    real eta_gamma_dt  = 0;
+    real g_lambda = 1;
+    real lambda0 = DFC_stress[ctSaveId].z;
+    if (floc_on_flag) {
+      lambda = rungeKutta4<real>(dfloc, lambda0, contact_duration[index], floc_beta, gamma_dt,
+				 floc_m, floc_tcr, dT, 1);
+      DFC_stress[ctSaveId].z = lambda;
+      if (gamma_dt <= gamma_0_dt) {
+	eta_gamma_dt = (1 - exp(-Abs(gamma_dt)/gamma_0_dt)) *
+	  (sigma_tau0 * (1 + lambda) / Abs(gamma_dt) + eta_inf * g_lambda);
+      }
+      else {
+	eta_gamma_dt = sigma_tau0 * (1 + lambda) / gamma_0_dt; // results in eta_0
+      }
+    }
+    else {
+      // in this branch lambda is equal to 0 (not changed from global parameters)
+      // if it will be confusing in future, remove lambda from equations
+      if (gamma_dt <= gamma_0_dt) {
+	eta_gamma_dt = (1 - exp(-Abs(gamma_dt)/gamma_0_dt)) *
+	  (sigma_tau0 * (1 + lambda) / Abs(gamma_dt) + eta_inf * g_lambda);
+      } else {
+	eta_gamma_dt = sigma_tau0 * (1 + lambda) / gamma_0_dt; 
+      }
+    }
+    // Calculate viscous stresses
+    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
+    //real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
+    real sigma_ML_tau = eta_gamma_dt * (Length(u_IJ_ML_dt_vec) / l_IJ);  // always positive
+
+    // calculate stiffness stresses
     real input_sigma_N_s = DFC_stress[ctSaveId].x;
     real input_sigma_ML_s = DFC_stress[ctSaveId].y;
     real sigma_N_s;

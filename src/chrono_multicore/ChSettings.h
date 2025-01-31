@@ -243,6 +243,10 @@ class dfc_parameters {
         mi_a_s = 0.5;
         t = 2.5e-3;
 	lambda = 0;
+	floc_beta = 1.0e-2;
+	floc_m = 1.0;
+	floc_tcr = 120;
+	floc_on_flag = false;
 	debug_verbose = false;
       }
       /// Mortar to mortar and mortar to aggregate stiffness
@@ -286,6 +290,10 @@ class dfc_parameters {
       real t;
       /// flocculation parameter
       real lambda;
+      real floc_beta;
+      real floc_m;
+      real floc_tcr;
+      bool floc_on_flag;
       /// Debug control, if debug_verbose is true, the implementation will print detailed contact
       /// data for all contact pairs stored in vector, probably there is better place to
       /// store this parameters as they are not relevant for model itself
