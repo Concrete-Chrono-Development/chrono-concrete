@@ -917,7 +917,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
       lambda = rungeKutta4<real>(dfloc, lambda0, contact_duration[index], floc_beta, gamma_dt,
 				 floc_m, floc_tcr, dT, 1);
       DFC_stress[ctSaveId].z = lambda;
-      if (gamma_dt <= gamma_0_dt) {
+      if (Abs(gamma_dt) > 0) {
 	eta_gamma_dt = (1 - exp(-Abs(gamma_dt)/gamma_0_dt)) *
 	  (sigma_tau0 * (1 + lambda) / Abs(gamma_dt) + eta_inf * g_lambda);
       }
@@ -929,10 +929,9 @@ void function_CalcDFCForces(int index,               // index of this contact pa
       // in this branch lambda is equal to 0 (not changed from global parameters)
       // if it will be confusing in future, remove lambda from equations
       if (gamma_dt <= gamma_0_dt) {
-	eta_gamma_dt = (1 - exp(-Abs(gamma_dt)/gamma_0_dt)) *
-	  (sigma_tau0 * (1 + lambda) / Abs(gamma_dt) + eta_inf * g_lambda);
-      } else {
 	eta_gamma_dt = sigma_tau0 * (1 + lambda) / gamma_0_dt; 
+      } else {
+	eta_gamma_dt = eta_inf*pow(Abs(gamma_dt), n-1) + sigma_tau0 * (1 + lambda) / gamma_0_dt; 
       }
     }
     // Calculate viscous stresses
