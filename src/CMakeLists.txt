@@ -525,7 +525,7 @@ add_subdirectory(chrono_synchrono)
 add_subdirectory(chrono_ros)
 add_subdirectory(chrono_swig/chrono_python)
 add_subdirectory(chrono_swig/chrono_csharp)
-add_subdirectory(chrono_wood)
+add_subdirectory(chrono_flow)
 
 # Add directories for demo programs, unit test programs, and benchmark test programs.
 if(BUILD_DEMOS)
@@ -691,10 +691,10 @@ else()
   set(CHRONO_PERIDYNAMICS "#undef CHRONO_PERIDYNAMICS")
 endif()
 
-if(CH_ENABLE_MODULE_WOOD)
-  set(CHRONO_WOOD "#define CHRONO_WOOD")
+if(CH_ENABLE_MODULE_FLOW)
+  set(CHRONO_FLOW "#define CHRONO_FLOW")
 else()
-  set(CHRONO_WOOD "#undef CHRONO_WOOD")
+  set(CHRONO_FLOW "#undef CHRONO_FLOW")
 endif()
 
 if(CH_USE_SIMD)
