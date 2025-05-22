@@ -1,115 +1,82 @@
 #===============================================================================
-# CMake configuration file for the Chrono wood module
+# CMake configuration file for the Chrono flow module
 #===============================================================================
 
-option(CH_ENABLE_MODULE_WOOD "Enable the Chrono wood module" OFF)
+option(CH_ENABLE_MODULE_FLOW "Enable the Chrono flow module" OFF)
 
 # Return now if this module is not enabled
-IF(NOT CH_ENABLE_MODULE_WOOD)
+IF(NOT CH_ENABLE_MODULE_FLOW)
   RETURN()
 ENDIF()
 
-MESSAGE(STATUS "\n==== Chrono WOOD module ====\n")
+MESSAGE(STATUS "\n==== Chrono FLOW module ====\n")
 
-# List all source and header files for the Chrono_wood library
-SET(Chrono_WOOD_SOURCES 
-    ChElementCurvilinearBeamBezier.cpp
-    ChElementCurvilinearBeamIGA.cpp
-    ChElementCBLCON.cpp
-    ChWoodMaterialVECT.cpp
-    ChBeamSectionCBLCON.cpp
-    ChBuilderCurvilinearBeam.cpp
-    ChBuilderCBLCON.cpp
-    ChLineBezierCBL.cpp
-    ChVisualShapeWOOD.cpp    
+# List all source and header files for the Chrono_flow library
+SET(Chrono_FLOW_SOURCES 
     ChNodeFEAxyzPP.cpp
     ChMeshFileLoaderBeam.cpp
     ChElementSpringP.cpp
-	ChMeshLine.cpp	
-	ChLinkPoint2Line.cpp
-	ChLinkNodeRotFace.cpp
-	ChLinkNodeNodeRot.cpp
-	ChRepresentedVolumeElement.cpp
-	delaunator.cpp
 )
 
-SET(Chrono_WOOD_HEADERS
-	  ChWoodApi.h
-    ChElementCurvilinearBeamBezier.h
-    ChElementCurvilinearBeamIGA.h
-    ChElementCBLCON.h
-    ChWoodMaterialVECT.h
-    ChBeamSectionCurvedIGA.h
-    ChBeamSectionCBLCON.h
-    ChBuilderCurvilinearBeam.h
-    ChBuilderCBLCON.h
-    ChLineBezierCBL.h
-    ChBasisToolsBeziers.h
-    ChVisualShapeWOOD.h      
+SET(Chrono_FLOW_HEADERS
+	  ChFlowApi.h
     ChNodeFEAxyzPP.h
     ChMeshFileLoaderBeam.h
     ChElementSpringP.h
     ChContinuumPoisson2D.h
     ChContinuumHydroThermal2D.h
-	ChMeshLine.h
-	ChMeshSurfaceGeneral.h
-	ChLinkPoint2Line.h
-	ChLinkNodeRotFace.h
-	ChLinkNodeNodeRot.h
-	ChRepresentedVolumeElement.h
-	delaunator.h
 )
 
 SOURCE_GROUP("" FILES 
-            ${Chrono_WOOD_SOURCES} 
-            ${Chrono_WOOD_HEADERS}
+            ${Chrono_FLOW_SOURCES} 
+            ${Chrono_FLOW_HEADERS}
 )
 
-# Include directories (ensure WOOD_INCLUDE_DIR is defined or specify the correct path)
+# Include directories (ensure FLOW_INCLUDE_DIR is defined or specify the correct path)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Create the Chrono_wood library
-ADD_LIBRARY(Chrono_wood
-  ${Chrono_WOOD_SOURCES}
-  ${Chrono_WOOD_HEADERS}
+# Create the Chrono_flow library
+ADD_LIBRARY(Chrono_flow
+  ${Chrono_FLOW_SOURCES}
+  ${Chrono_FLOW_HEADERS}
 )
 
 # Set compiler and linker flags
-SET_TARGET_PROPERTIES(Chrono_wood PROPERTIES
+SET_TARGET_PROPERTIES(Chrono_flow PROPERTIES
   COMPILE_FLAGS "${CH_CXX_FLAGS}"
   LINK_FLAGS "${CH_LINKERFLAG_LIB}"
 )
 
 # Compile definitions
-target_compile_definitions(Chrono_wood PRIVATE "CH_WOOD_API_COMPILE")
-target_compile_definitions(Chrono_wood PRIVATE "CH_IGNORE_DEPRECATED")
+target_compile_definitions(Chrono_flow PRIVATE "CH_FLOW_API_COMPILE")
+target_compile_definitions(Chrono_flow PRIVATE "CH_IGNORE_DEPRECATED")
 
 # Link required libraries
-TARGET_LINK_LIBRARIES(Chrono_wood
+TARGET_LINK_LIBRARIES(Chrono_flow
   Chrono_core 
 )
 
 # Handle Windows DLL copying
 #IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 #  ADD_CUSTOM_COMMAND(
-#    TARGET Chrono_wood POST_BUILD
+#    TARGET Chrono_flow POST_BUILD
 #    COMMAND ${CMAKE_COMMAND} -E make_directory
 #            "${CMAKE_BINARY_DIR}/bin/$<CONFIGURATION>"
 #    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#            "${CH_WOOD_DLL}"
+#            "${CH_FLOW_DLL}"
 #            "${CMAKE_BINARY_DIR}/bin/$<CONFIGURATION>"
-#    COMMENT "Copying WOOD DLL..."
+#    COMMENT "Copying FLOW DLL..."
 #  )
-#  install(FILES "${CH_WOOD_DLL}" DESTINATION bin)
+#  install(FILES "${CH_FLOW_DLL}" DESTINATION bin)
 #ENDIF()
 
 # Install the library and headers
-INSTALL(TARGETS Chrono_wood
+INSTALL(TARGETS Chrono_flow
   EXPORT ChronoTargets
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )
 
-INSTALL(FILES ${Chrono_WOOD_HEADERS} DESTINATION include/chrono_wood)
+INSTALL(FILES ${Chrono_FLOW_HEADERS} DESTINATION include/chrono_flow)
 

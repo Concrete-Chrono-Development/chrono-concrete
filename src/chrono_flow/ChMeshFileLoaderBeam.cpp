@@ -26,11 +26,11 @@
 #include "chrono/core/ChFrame.h"
 #include "chrono/physics/ChSystem.h"
 
-#include "chrono_wood/ChNodeFEAxyzPP.h"
-#include "chrono_wood/ChElementSpringP.h"
-#include "chrono_wood/ChMeshFileLoaderBeam.h"
-#include "chrono_wood/ChContinuumHydroThermal2D.h"
-#include "chrono_wood/ChContinuumPoisson2D.h"
+#include "chrono_flow/ChNodeFEAxyzPP.h"
+#include "chrono_flow/ChElementSpringP.h"
+#include "chrono_flow/ChMeshFileLoaderBeam.h"
+#include "chrono_flow/ChContinuumHydroThermal2D.h"
+#include "chrono_flow/ChContinuumPoisson2D.h"
 
 #include "chrono/fea/ChElementShellANCF_3423.h"
 #include "chrono/fea/ChElementTetraCorot_4.h"
@@ -42,7 +42,7 @@ using namespace chrono::fea;
 using namespace chrono;
 
 namespace chrono {
-namespace wood {
+namespace flow {
 
 void ChMeshFileLoaderBeam::FromTetGenFile(std::shared_ptr<ChMesh> mesh,
                                       const char* filename_node,
@@ -853,5 +853,5 @@ void ChMeshFileLoaderBeam::BSTShellFromObjFile(
     }
 }
 
-}  // end namespace wood
+}  // end namespace flow
 }  // end namespace chrono

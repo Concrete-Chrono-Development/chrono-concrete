@@ -25,11 +25,11 @@
 #include <chrono/timestepper/ChTimestepperHHT.h>
 #include "chrono_pardisomkl/ChSolverPardisoMKL.h"
 
-#include "chrono_wood/ChElementSpringP.h"
-#include "chrono_wood/ChContinuumHydroThermal2D.h"
-#include "chrono_wood/ChContinuumPoisson2D.h"
-#include "chrono_wood/ChMeshFileLoaderBeam.h"
-#include "chrono_wood/ChNodeFEAxyzPP.h"
+#include "chrono_flow/ChElementSpringP.h"
+#include "chrono_flow/ChContinuumHydroThermal2D.h"
+#include "chrono_flow/ChContinuumPoisson2D.h"
+#include "chrono_flow/ChMeshFileLoaderBeam.h"
+#include "chrono_flow/ChNodeFEAxyzPP.h"
 
 #include "chrono/fea/ChElementTetraCorot_4.h"
 #include "chrono/fea/ChContinuumThermal.h"
@@ -66,7 +66,7 @@
 using namespace chrono;
 using namespace chrono::fea;
 using namespace chrono::irrlicht;
-using namespace chrono::wood;
+using namespace chrono::flow;
 using namespace irr;
 
 void WriteMesh(std::shared_ptr<ChMesh> mesh, const std::string& mesh_filename) {

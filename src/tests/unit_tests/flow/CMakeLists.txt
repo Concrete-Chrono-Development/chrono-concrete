@@ -1,16 +1,14 @@
-# Unit tests for the wood Chrono module
+# Unit tests for the flow Chrono module
 # ==================================================================
 
 
 
 SET(LIBRARIES
     Chrono_core
-    Chrono_wood
+    Chrono_flow
 )
 
 SET(TESTS
-    utest_WOOD_CBLCON
-    utest_WOOD_MaterialVECT
 )
 
 # A hack to set the working directory in which to execute the CTest
@@ -24,7 +22,7 @@ else()
 endif()
 
 
-message(STATUS "Add unit test programs for WOOD module")
+message(STATUS "Add unit test programs for FLOW module")
 
 FOREACH(PROGRAM ${TESTS})
 

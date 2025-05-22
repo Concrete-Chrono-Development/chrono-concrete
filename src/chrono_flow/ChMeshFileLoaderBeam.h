@@ -19,25 +19,25 @@
 
 #include <map>
 
-#include "chrono_wood/ChElementSpringP.h"
+#include "chrono_flow/ChElementSpringP.h"
 #include "chrono/fea/ChElementShellANCF_3423.h"
 #include "chrono/fea/ChElementShellBST.h"
 #include "chrono/fea/ChMesh.h"
 #include "chrono/core/ChMatrix.h"
 
-#include "chrono_wood/ChWoodApi.h"
+#include "chrono_flow/ChFlowApi.h"
 
 using namespace chrono::fea;
 using namespace chrono;
 
 namespace chrono {
-namespace wood {
+namespace flow {
 
 /// @addtogroup fea_utils
 /// @{
 
 /// Collection of mesh file loader utilities.
-class ChWoodApi ChMeshFileLoaderBeam {
+class ChFlowApi ChMeshFileLoaderBeam {
   public:
     /// Load tetrahedrons from .node and .ele files as saved by TetGen.
     /// The file format for .node (with point# starting from 1) is:
@@ -101,7 +101,7 @@ class ChWoodApi ChMeshFileLoaderBeam {
 
 /// @} fea_utils
 
-}  // end namespace wood
+}  // end namespace flow
 }  // end namespace chrono
 
 #endif

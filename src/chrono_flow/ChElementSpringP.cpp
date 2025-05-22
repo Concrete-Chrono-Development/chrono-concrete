@@ -15,7 +15,7 @@
 #include "ChElementSpringP.h"
 
 namespace chrono {
-namespace wood {
+namespace flow {
 
 ChElementSpringP::ChElementSpringP() : Volume(0) {
     nodes.resize(2);
@@ -204,5 +204,5 @@ void ChElementSpringP::ComputeNF(const double U,
     //detJ /= 4.0;  // because volume
 }
 
-}  // end namespace wood
+}  // end namespace flow
 }  // end namespace chrono

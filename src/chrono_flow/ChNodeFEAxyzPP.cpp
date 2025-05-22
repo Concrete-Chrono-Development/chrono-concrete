@@ -12,10 +12,10 @@
 // Authors: Andrea Favali, Alessandro Tasora, Radu Serban
 // =============================================================================
 
-#include "chrono_wood/ChNodeFEAxyzPP.h"
+#include "chrono_flow/ChNodeFEAxyzPP.h"
 
 namespace chrono {
-namespace wood {
+namespace flow {
 
 ChNodeFEAxyzPP::ChNodeFEAxyzPP(ChVector3d initial_pos) : pos(initial_pos), P(0, 0, 0), P_dt(0, 0, 0), F(0, 0, 0) {
     variables.SetNodeMass(0);
@@ -193,5 +193,5 @@ void ChNodeFEAxyzPP::ArchiveIn(ChArchiveIn& archive_in) {
     archive_in >> CHNVP(F);
 }
 
-}  // end namespace wood
+}  // end namespace flow
 }  // end namespace chrono

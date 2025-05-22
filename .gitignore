@@ -106,4 +106,4 @@ build_chrono_website.sh
 refman.pdf
 src/chrono_granular/DoxyGenDocs/
 *.vtk
-template_project_wood/out/hist.dat
+template_project_flow/out/hist.dat

@@ -12,32 +12,32 @@
 // Authors: Alessandro Tasora
 // =============================================================================
 
-#ifndef CH_WOOD_API_H
-#define CH_WOOD_API_H
+#ifndef CH_FLOW_API_H
+#define CH_FLOW_API_H
 
 #include "chrono/ChVersion.h"
 #include "chrono/core/ChPlatform.h"
 
-// When compiling this library, remember to define CH_API_COMPILE_WOOD
-// (so that the symbols with 'ChWoodApi' in front of them will be
+// When compiling this library, remember to define CH_API_COMPILE_FLOW
+// (so that the symbols with 'ChFlowApi' in front of them will be
 // marked as exported). Otherwise, just do not define it if you
 // link the library to your code, and the symbols will be imported.
 
-#if defined(CH_WOOD_API_COMPILE)
-#define ChWoodApi ChApiEXPORT
+#if defined(CH_FLOW_API_COMPILE)
+#define ChFlowApi ChApiEXPORT
 #else
-#define ChWoodApi ChApiIMPORT
+#define ChFlowApi ChApiIMPORT
 #endif
 
 
 
 namespace chrono {
 
-/// @addtogroup WOOD_module
+/// @addtogroup FLOW_module
 /// @{
 
-/// Namespace with classes for the WOOD module.
-namespace wood {}
+/// Namespace with classes for the FLOW module.
+namespace flow {}
 
 /// @}
 
